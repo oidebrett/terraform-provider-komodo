@@ -1,0 +1,55 @@
+# Go build artifacts
+/bin/
+/dist/
+/build/
+*.exe
+*.test
+*.out
+
+# Go modules and package cache
+/go.sum
+/go.work
+/go.work.sum
+
+# Terraform plugin registry format (if using `make install`)
+*.zip
+*.tar.gz
+
+# Terraform state files
+*.tfstate
+*.tfstate.backup
+crash.log
+
+# .terraform directory (plugin binaries, state, etc.)
+**/.terraform/
+.terraform.lock.hcl
+
+# Editor/IDE specific
+.vscode/
+.idea/
+*.swp
+*.swo
+*.DS_Store
+
+# Test coverage and result files
+coverage.*
+*.coverprofile
+
+# GitHub workflows if they are generated
+/.github/
+
+# Local environment config (if any)
+.env
+.env.*
+
+# Logs
+*.log
+
+# Ignore your own local provider binary (name it below)
+**/terraform-provider-myuserprovider*
+**/terraform-provider-contextware*
+
+**/your-service-account-key.json
+
+**/terraform.tfstate
+**/terraform.tfstate.backup
