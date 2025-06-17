@@ -75,7 +75,7 @@ provider "aws" {
 
 #resource "aws_key_pair" "VPS-key" {
 #  key_name   = "VPS-key"
-  public_key = "ssh-rsa YOURSSHKEYHERE"
+#  public_key = "ssh-rsa YOURSSHKEYHERE"
 #}
 
 # Create AWS EC2 instance
