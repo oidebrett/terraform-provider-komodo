@@ -107,24 +107,9 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		return
 	}
 	
-	// Create the user
-	response, err := r.client.Post(
-		r.endpoint+state.Id.ValueString(), 
-		"application/text", 
-		bytes.NewBuffer([]byte(state.ServerIP.ValueString())),
-	)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error sending request: %s", err))
-		return
-	}
+	// Skip the user creation API call that was here before
+	// We're keeping the endpoint for other API calls
 	
-	defer response.Body.Close()
-	
-	if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("HTTP Error", fmt.Sprintf("Received non-OK HTTP status: %s", response.Status))
-		return
-	}
-
 	// 1. Create a server using the server_ip
 	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
 	createServerPayload := fmt.Sprintf(`{
@@ -138,7 +123,7 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		}
 	}`, serverName, state.ServerIP.ValueString(), state.Name.ValueString())
 
-	err = r.makeAPICall(createServerPayload, "http://198.12.108.91:9120/write")
+	err = r.makeAPICall(createServerPayload, r.endpoint+"write")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating server: %s", err))
 		return
@@ -162,7 +147,7 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		}
 	}`, serverName)
 	
-	err = r.makeAPICall(updateServerPayload, "http://198.12.108.91:9120/write")
+	err = r.makeAPICall(updateServerPayload, r.endpoint+"write")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error enabling server: %s", err))
 		return
@@ -187,7 +172,7 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		}
 	}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
 	
-	err = r.makeAPICall(createContextWarePayload, "http://198.12.108.91:9120/write")
+	err = r.makeAPICall(createContextWarePayload, r.endpoint+"write")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating ContextWare resource sync: %s", err))
 		return
@@ -201,7 +186,7 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		}
 	}`, state.Name.ValueString())
 	
-	err = r.makeAPICall(runContextWarePayload, "http://198.12.108.91:9120/execute")
+	err = r.makeAPICall(runContextWarePayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running ContextWare sync: %s", err))
 		return
@@ -218,7 +203,7 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		}
 	}`, state.Name.ValueString())
 	
-	err = r.makeAPICall(runResourceSetupPayload, "http://198.12.108.91:9120/execute")
+	err = r.makeAPICall(runResourceSetupPayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running ResourceSetup sync: %s", err))
 		return
@@ -235,7 +220,7 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		}
 	}`, state.Name.ValueString())
 	
-	err = r.makeAPICall(runProcedurePayload, "http://198.12.108.91:9120/execute")
+	err = r.makeAPICall(runProcedurePayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running procedure: %s", err))
 		return
@@ -251,32 +236,9 @@ func (r *UserResource) Read(ctx context.Context, req tfresource.ReadRequest, res
 		return
 	}
 	
-	// Get the user
-	response, err := r.client.Get(r.endpoint + state.Id.ValueString())
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to read user, got error: %s", err))
-		return
-	}
-	defer response.Body.Close()
-	
-	if response.StatusCode == http.StatusNotFound {
-		resp.State.RemoveResource(ctx)
-		return
-	}
-	
-	if response.StatusCode == http.StatusOK {
-		bodyBytes, err := io.ReadAll(response.Body)
-		if err != nil {
-			resp.Diagnostics.AddError("Error reading response body", err.Error())
-			return
-		}
-		state.ServerIP = tftypes.StringValue(string(bodyBytes))
-		
-		resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
-		return
-	}
-	
-	resp.Diagnostics.AddError("HTTP Error", fmt.Sprintf("Received bad HTTP status: %s", response.Status))
+	// Skip the user read API call
+	// Just set the state directly
+	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
 func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
@@ -297,7 +259,7 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		}
 	}`, data.Name.ValueString())
 	
-	err := r.makeAPICall(runDestroyPayload, "http://198.12.108.91:9120/execute")
+	err := r.makeAPICall(runDestroyPayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running destroy procedure: %s", err))
 		// Continue with deletion even if API call fails
@@ -338,7 +300,7 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		}
 	}`, data.Name.ValueString())
 	
-	err = retryAPICall(deleteProcedureApplyPayload, "http://198.12.108.91:9120/write", 5)
+	err = retryAPICall(deleteProcedureApplyPayload, r.endpoint+"write", 5)
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting apply procedure after retries: %s", err))
 		// Continue with deletion even if API call fails
@@ -354,7 +316,7 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		}
 	}`, data.Name.ValueString())
 	
-	err = retryAPICall(deleteProcedureDestroyPayload, "http://198.12.108.91:9120/write", 5)
+	err = retryAPICall(deleteProcedureDestroyPayload, r.endpoint+"write", 5)
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting destroy procedure after retries: %s", err))
 		// Continue with deletion even if API call fails
@@ -371,7 +333,7 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		}
 	}`, data.Name.ValueString())
 	
-	err = retryAPICall(deleteResourceSetupSyncPayload, "http://198.12.108.91:9120/write", 5)
+	err = retryAPICall(deleteResourceSetupSyncPayload, r.endpoint+"write", 5)
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting ResourceSetup sync after retries: %s", err))
 		// Continue with deletion even if API call fails
@@ -387,7 +349,7 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		}
 	}`, data.Name.ValueString())
 	
-	err = retryAPICall(deleteContextWareSyncPayload, "http://198.12.108.91:9120/write", 5)
+	err = retryAPICall(deleteContextWareSyncPayload, r.endpoint+"write", 5)
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting ContextWare sync after retries: %s", err))
 		// Continue with deletion even if API call fails
@@ -402,7 +364,7 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		}
 	}`, serverName)
 	
-	err = retryAPICall(deleteServerPayload, "http://198.12.108.91:9120/write", 3)
+	err = retryAPICall(deleteServerPayload, r.endpoint+"write", 3)
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting server after retries: %s", err))
 		// Continue with deletion even if API call fails
@@ -415,22 +377,8 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		// Continue with the API call even if GitHub deletion fails
 	}
 	
-	// Then proceed with your existing API call
-	request, err := http.NewRequest(http.MethodDelete, r.endpoint+data.Id.ValueString(), nil)
-	if err != nil {
-		resp.Diagnostics.AddError("Request Creation Failed", fmt.Sprintf("Could not create HTTP request: %s", err))
-		return
-	}
-	response, err := r.client.Do(request)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Unable to delete user, got error: %s", err))
-		return
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("HTTP Error", fmt.Sprintf("Received non-OK HTTP status: %s", response.Status))
-		return
-	}
+	// Skip the user deletion API call
+	// Just clear the state
 	data.Id = tftypes.StringValue("")
 	data.Name = tftypes.StringValue("")
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
@@ -452,25 +400,8 @@ func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest,
 		return
 	}
 	
-	// Update the user name
-	webserviceCall, err := http.NewRequest("PUT", r.endpoint+state.Id.ValueString(), bytes.NewBuffer([]byte(state.Name.ValueString())))
-	if err != nil {
-		resp.Diagnostics.AddError("Go Error", fmt.Sprintf("Error creating request: %s", err))
-		return
-	}
-	
-	response, err := r.client.Do(webserviceCall)
-	if err != nil {
-		resp.Diagnostics.AddError("Client Error", fmt.Sprintf("Error sending request: %s", err))
-		return
-	}
-	
-	defer response.Body.Close()
-	
-	if response.StatusCode != http.StatusOK {
-		resp.Diagnostics.AddError("HTTP Error", fmt.Sprintf("Received non-OK HTTP status: %s", response.Status))
-		return
-	}
+	// Skip the user update API call that was here before
+	// We're keeping the endpoint for other API calls
 	
 	// Update GitHub repository file if needed
 	if !state.FileContents.IsNull() && !state.FileContents.Equal(oldState.FileContents) {
@@ -512,7 +443,7 @@ func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest,
 			}
 		}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
 		
-		err = r.makeAPICall(createSyncPayload, "http://198.12.108.91:9120/write")
+		err = r.makeAPICall(createSyncPayload, r.endpoint+"write")
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error updating resource sync: %s", err))
 			return
@@ -526,7 +457,7 @@ func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest,
 			}
 		}`, state.Name.ValueString())
 		
-		err = r.makeAPICall(runSyncPayload, "http://198.12.108.91:9120/execute")
+		err = r.makeAPICall(runSyncPayload, r.endpoint+"execute")
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running sync: %s", err))
 			return
@@ -540,7 +471,7 @@ func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest,
 			}
 		}`, state.Name.ValueString())
 		
-		err = r.makeAPICall(runProcedurePayload, "http://198.12.108.91:9120/execute")
+		err = r.makeAPICall(runProcedurePayload, r.endpoint+"execute")
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running procedure: %s", err))
 			return
@@ -780,7 +711,7 @@ func (r *UserResource) waitForServerAvailability(serverName string, maxAttempts 
 		
 		// Make the API call
 		client := &http.Client{}
-		req, err := http.NewRequest("POST", "http://198.12.108.91:9120/read", bytes.NewBuffer([]byte(getServerPayload)))
+		req, err := http.NewRequest("POST", r.endpoint+"read", bytes.NewBuffer([]byte(getServerPayload)))
 		if err != nil {
 			return fmt.Errorf("error creating request: %s", err)
 		}
@@ -841,7 +772,7 @@ func (r *UserResource) waitForServerStateEnabled(serverName string, maxAttempts 
 		
 		// Make the API call
 		client := &http.Client{}
-		req, err := http.NewRequest("POST", "http://198.12.108.91:9120/read", bytes.NewBuffer([]byte(getServerStatePayload)))
+		req, err := http.NewRequest("POST", r.endpoint+"read", bytes.NewBuffer([]byte(getServerStatePayload)))
 		if err != nil {
 			return fmt.Errorf("error creating request: %s", err)
 		}

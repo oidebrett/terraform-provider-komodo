@@ -21,8 +21,8 @@ terraform {
 provider "google" {
   credentials = file("/workspace/2_customer/your-service-account-key.json")
   project     = "matter-test1-133b7"
-  region      = "europe-west1"
-  zone        = "europe-west1-b"
+  region      = "us-central1"
+  zone        = "us-central1-a"
 }
 
 resource "google_compute_firewall" "allow-ssh-and-8120" {
@@ -42,7 +42,7 @@ resource "google_compute_firewall" "allow-ssh-and-8120" {
 resource "google_compute_instance" "gcp_vm" {
   name         = "gcp-client-instance"
   machine_type = "e2-medium"
-  zone         = "europe-west1-b"
+  zone         = "us-central1-a"
 
   boot_disk {
     initialize_params {
@@ -142,7 +142,7 @@ provider "aws" {
 
 # configure the providers
 provider "myuserprovider" {
-  endpoint      = "http://localhost:6251/"
+  endpoint      = "http://198.12.108.91:9120"  # Works without trailing slash
   github_token  = "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" # Replace with your actual GitHub token
 }
 
