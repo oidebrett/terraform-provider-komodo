@@ -3,6 +3,7 @@ package provider
 import (
 	"context"
 	"net/http"
+	"strings"
 
 	tfdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	tffunction "github.com/hashicorp/terraform-plugin-framework/function"
@@ -65,7 +66,13 @@ func (p *UserProvider) Configure(ctx context.Context, req tfprovider.ConfigureRe
 		return
 	}
 	
-	p.endpoint = data.Endpoint.ValueString()
+	// Ensure the endpoint ends with a trailing slash
+	endpoint := data.Endpoint.ValueString()
+	if !strings.HasSuffix(endpoint, "/") {
+		endpoint = endpoint + "/"
+	}
+	
+	p.endpoint = endpoint
 	p.githubToken = data.GithubToken.ValueString() // Store the GitHub token
 	p.githubOrgname = data.GithubOrgname.ValueString() // Store the GitHub org name
 	p.client = http.DefaultClient
