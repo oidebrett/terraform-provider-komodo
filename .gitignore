@@ -53,3 +53,6 @@ coverage.*
 
 **/terraform.tfstate
 **/terraform.tfstate.backup
+
+# .terraform variable values
+**/terraform.tfvars
