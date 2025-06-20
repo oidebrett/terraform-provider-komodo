@@ -1,0 +1,49 @@
+# Copy this file to terraform.tfvars and fill in your actual values
+# Do not commit terraform.tfvars to version control!
+
+# GCP Configuration
+gcp_project_id       = "your-gcp-project-id"
+gcp_region          = "us-central1"
+gcp_zone            = "us-central1-a"
+gcp_credentials_file = "/path/to/your-service-account-key.json"
+
+# Instance Configuration
+instance_name = "my-client-instance"
+machine_type  = "e2-medium"
+client_name   = "MyClient"
+client_id     = "1"
+
+# SSH Configuration
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB... your-ssh-key-here"
+ssh_username   = "ubuntu"
+
+# Application Configuration
+domain                  = "yourdomain.com"
+admin_email            = "admin@yourdomain.com"
+admin_username         = "admin@yourdomain.com"
+admin_password         = "your-secure-password"
+admin_subdomain        = "admin"
+crowdsec_enrollment_key = "your-crowdsec-key"
+
+# Database Configuration
+postgres_user     = "admin"
+postgres_password = "your-postgres-password"
+postgres_host     = "pangolin-postgres"
+
+# OAuth Configuration
+oauth_client_id     = "your-oauth-client-id"
+oauth_client_secret = "your-oauth-client-secret"
+
+# Custom Provider Configuration
+myuserprovider_endpoint = "http://your-endpoint:9120"
+github_token           = "your-github-token"
+
+# Repository Configuration
+github_repo = "your-username/your-repo"
+
+# Feature Flags
+static_page = true
+
+# Network Configuration
+allowed_ports          = ["22", "8120"]
+firewall_source_ranges = ["0.0.0.0/0"]  # Consider restricting this for better security
