@@ -3,8 +3,10 @@ package provider
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
+	"math/rand"
 	"net/http"
 	"regexp"
 	"strings"
@@ -122,6 +124,122 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 		resp.Diagnostics.AddError("HTTP Error", fmt.Sprintf("Received non-OK HTTP status: %s", response.Status))
 		return
 	}
+
+	// 1. Create a server using the server_ip
+	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
+	createServerPayload := fmt.Sprintf(`{
+		"type": "CreateServer",
+		"params": {
+			"name": "%s",
+			"config": {
+				"address": "https://%s:8120"
+			},
+			"tags": ["%s"]
+		}
+	}`, serverName, state.ServerIP.ValueString(), state.Name.ValueString())
+
+	err = r.makeAPICall(createServerPayload, "http://198.12.108.91:9120/write")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating server: %s", err))
+		return
+	}
+	
+	// Wait for the server to become available, checking every 10 seconds for up to 3 minutes
+	err = r.waitForServerAvailability(serverName, 18, 10*time.Second)
+	if err != nil {
+		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to become available: %s", err))
+		return
+	}
+	
+	// Enable the server
+	updateServerPayload := fmt.Sprintf(`{
+		"type": "UpdateServer",
+		"params": {
+			"id": "%s",
+			"config": {
+				"enabled": true
+			}
+		}
+	}`, serverName)
+	
+	err = r.makeAPICall(updateServerPayload, "http://198.12.108.91:9120/write")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error enabling server: %s", err))
+		return
+	}
+	
+	// Wait for the server to reach OK state, checking every 10 seconds for up to 3 minutes
+	err = r.waitForServerStateEnabled(serverName, 18, 10*time.Second)
+	if err != nil {
+		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to reach OK state: %s", err))
+		return
+	}
+
+	// Now make the additional API calls
+	// 2. Create Resource Sync for ContextWare
+	createContextWarePayload := fmt.Sprintf(`{
+		"type": "CreateResourceSync",
+		"params": {
+			"name": "%s_ContextWare",
+			"config": {
+				"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"oidebrett/%s_syncresources\"\ngit_account = \"oidebrett\"\nresource_path = [\"resources.toml\"]"
+			}
+		}
+	}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
+	
+	err = r.makeAPICall(createContextWarePayload, "http://198.12.108.91:9120/write")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating ContextWare resource sync: %s", err))
+		return
+	}
+	
+	// 3. Run the ContextWare sync first
+	runContextWarePayload := fmt.Sprintf(`{
+		"type": "RunSync",
+		"params": {
+			"sync": "%s_ContextWare"
+		}
+	}`, state.Name.ValueString())
+	
+	err = r.makeAPICall(runContextWarePayload, "http://198.12.108.91:9120/execute")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running ContextWare sync: %s", err))
+		return
+	}
+	
+	// Wait for the ContextWare sync to complete (up to 5 seconds)
+	time.Sleep(5 * time.Second)
+	
+	// 4. Now run the ResourceSetup sync
+	runResourceSetupPayload := fmt.Sprintf(`{
+		"type": "RunSync",
+		"params": {
+			"sync": "%s_ResourceSetup"
+		}
+	}`, state.Name.ValueString())
+	
+	err = r.makeAPICall(runResourceSetupPayload, "http://198.12.108.91:9120/execute")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running ResourceSetup sync: %s", err))
+		return
+	}
+
+	// Wait for the ResourceSetup sync to complete (up to 5 seconds)
+	time.Sleep(5 * time.Second)
+
+	// 5. Run Procedure
+	runProcedurePayload := fmt.Sprintf(`{
+		"type": "RunProcedure",
+		"params": {
+			"procedure": "%s_ProcedureApply"
+		}
+	}`, state.Name.ValueString())
+	
+	err = r.makeAPICall(runProcedurePayload, "http://198.12.108.91:9120/execute")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running procedure: %s", err))
+		return
+	}
 	
 	resp.State.Set(ctx, &state)
 }
@@ -168,8 +286,130 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 		return
 	}
 	
-	// First, delete the GitHub repository
-	err := r.deleteGitHubRepository(ctx, data.Name.ValueString())
+	// Initialize random number generator
+	rand.Seed(time.Now().UnixNano())
+	
+	// First, run the destroy procedure
+	runDestroyPayload := fmt.Sprintf(`{
+		"type": "RunProcedure",
+		"params": {
+			"procedure": "%s_ProcedureDestroy"
+		}
+	}`, data.Name.ValueString())
+	
+	err := r.makeAPICall(runDestroyPayload, "http://198.12.108.91:9120/execute")
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running destroy procedure: %s", err))
+		// Continue with deletion even if API call fails
+	}
+	
+	// Wait for the ProcedureDestroy to complete (up to 5 seconds)
+	time.Sleep(5 * time.Second)
+
+	// Function to retry API calls with backoff
+	retryAPICall := func(payload, url string, maxRetries int) error {
+		var lastErr error
+		for i := 0; i < maxRetries; i++ {
+			err := r.makeAPICall(payload, url)
+			if err == nil {
+				return nil
+			}
+			
+			lastErr = err
+			// If we get a "Procedure busy" error, wait and retry
+			if strings.Contains(err.Error(), "Procedure busy") {
+				// Longer exponential backoff with more randomness
+				sleepTime := time.Duration(3*(i+1)+rand.Intn(3)) * time.Second
+				time.Sleep(sleepTime)
+				continue
+			}
+			
+			// For other errors, don't retry
+			return err
+		}
+		return lastErr
+	}
+	
+	// Delete the procedures with retry
+	deleteProcedureApplyPayload := fmt.Sprintf(`{
+		"type": "DeleteProcedure",
+		"params": {
+			"id": "%s_ProcedureApply"
+		}
+	}`, data.Name.ValueString())
+	
+	err = retryAPICall(deleteProcedureApplyPayload, "http://198.12.108.91:9120/write", 5)
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting apply procedure after retries: %s", err))
+		// Continue with deletion even if API call fails
+	}
+	
+	// Wait a bit between procedure deletions
+	time.Sleep(2 * time.Second)
+	
+	deleteProcedureDestroyPayload := fmt.Sprintf(`{
+		"type": "DeleteProcedure",
+		"params": {
+			"id": "%s_ProcedureDestroy"
+		}
+	}`, data.Name.ValueString())
+	
+	err = retryAPICall(deleteProcedureDestroyPayload, "http://198.12.108.91:9120/write", 5)
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting destroy procedure after retries: %s", err))
+		// Continue with deletion even if API call fails
+	}
+	
+	// Wait a bit before deleting resource syncs
+	time.Sleep(2 * time.Second)
+	
+	// Delete the resource syncs with retry
+	deleteResourceSetupSyncPayload := fmt.Sprintf(`{
+		"type": "DeleteResourceSync",
+		"params": {
+			"id": "%s_ResourceSetup"
+		}
+	}`, data.Name.ValueString())
+	
+	err = retryAPICall(deleteResourceSetupSyncPayload, "http://198.12.108.91:9120/write", 5)
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting ResourceSetup sync after retries: %s", err))
+		// Continue with deletion even if API call fails
+	}
+	
+	// Wait a bit between resource sync deletions
+	time.Sleep(2 * time.Second)
+	
+	deleteContextWareSyncPayload := fmt.Sprintf(`{
+		"type": "DeleteResourceSync",
+		"params": {
+			"id": "%s_ContextWare"
+		}
+	}`, data.Name.ValueString())
+	
+	err = retryAPICall(deleteContextWareSyncPayload, "http://198.12.108.91:9120/write", 5)
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting ContextWare sync after retries: %s", err))
+		// Continue with deletion even if API call fails
+	}
+	
+	// Delete the server
+	serverName := fmt.Sprintf("server-%s", strings.ToLower(data.Name.ValueString()))
+	deleteServerPayload := fmt.Sprintf(`{
+		"type": "DeleteServer",
+		"params": {
+			"id": "%s"
+		}
+	}`, serverName)
+	
+	err = retryAPICall(deleteServerPayload, "http://198.12.108.91:9120/write", 3)
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting server after retries: %s", err))
+		// Continue with deletion even if API call fails
+	}
+	
+	// Delete the GitHub repository
+	err = r.deleteGitHubRepository(ctx, data.Name.ValueString())
 	if err != nil {
 		resp.Diagnostics.AddError("GitHub Error", fmt.Sprintf("Error deleting GitHub repository: %s", err))
 		// Continue with the API call even if GitHub deletion fails
@@ -259,6 +499,52 @@ func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest,
 			resp.Diagnostics.AddError("GitHub Error", fmt.Sprintf("Error updating file in repository: %s", err))
 			return
 		}
+		
+		// Run the API calls again to update the resources
+		// 1. Create/Update Resource Sync
+		createSyncPayload := fmt.Sprintf(`{
+			"type": "CreateResourceSync",
+			"params": {
+				"name": "%s_ContextWare",
+				"config": {
+					"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"oidebrett/%s_syncresources\"\ngit_account = \"oidebrett\"\nresource_path = [\"resources.toml\"]"
+				}
+			}
+		}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
+		
+		err = r.makeAPICall(createSyncPayload, "http://198.12.108.91:9120/write")
+		if err != nil {
+			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error updating resource sync: %s", err))
+			return
+		}
+		
+		// 2. Run Sync
+		runSyncPayload := fmt.Sprintf(`{
+			"type": "RunSync",
+			"params": {
+				"sync": "%s_ResourceSetup"
+			}
+		}`, state.Name.ValueString())
+		
+		err = r.makeAPICall(runSyncPayload, "http://198.12.108.91:9120/execute")
+		if err != nil {
+			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running sync: %s", err))
+			return
+		}
+		
+		// 3. Run Procedure
+		runProcedurePayload := fmt.Sprintf(`{
+			"type": "RunProcedure",
+			"params": {
+				"procedure": "%s_ProcedureApply"
+			}
+		}`, state.Name.ValueString())
+		
+		err = r.makeAPICall(runProcedurePayload, "http://198.12.108.91:9120/execute")
+		if err != nil {
+			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running procedure: %s", err))
+			return
+		}
 	}
 	
 	resp.State.Set(ctx, &state)
@@ -270,8 +556,8 @@ func (r *UserResource) ImportState(ctx context.Context, req tfresource.ImportSta
 
 // Add this new method to create GitHub repository
 func (r *UserResource) createGitHubRepository(ctx context.Context, repoName string, fileContents string) error {
-	// Sanitize the repository name
-	sanitizedName := sanitizeRepoName(repoName)
+	// Sanitize the repository name and append "_syncresources"
+	sanitizedName := sanitizeRepoName(repoName) + "_syncresources"
 	
 	// Check if token is available
 	if r.githubToken == "" {
@@ -285,11 +571,11 @@ func (r *UserResource) createGitHubRepository(ctx context.Context, repoName stri
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
 	
-	// Create repository
+	// Create repository - set Private to true
 	repo := &github.Repository{
 		Name:        github.String(sanitizedName),
 		Description: github.String("Created by custom Terraform provider"),
-		Private:     github.Bool(false),
+		Private:     github.Bool(true), // Changed to true to make the repository private
 		AutoInit:    github.Bool(true), // Initialize with README so we have a main branch
 	}
 	
@@ -331,10 +617,10 @@ func (r *UserResource) createGitHubRepository(ctx context.Context, repoName stri
 			defaultBranch = *repoInfo.DefaultBranch
 		}
 		
-		// Create the file
+		// Create the file - changed from contents.txt to resources.toml
 		fileContent := []byte(fileContents)
 		opts := &github.RepositoryContentFileOptions{
-			Message:   github.String("Add contents.txt via Terraform"),
+			Message:   github.String("Add resources.toml via Terraform"),
 			Content:   fileContent,
 			Branch:    github.String(defaultBranch),
 			Committer: &github.CommitAuthor{
@@ -343,7 +629,7 @@ func (r *UserResource) createGitHubRepository(ctx context.Context, repoName stri
 			},
 		}
 		
-		_, _, err = client.Repositories.CreateFile(ctx, repoOwner, sanitizedName, ".env", opts)
+		_, _, err = client.Repositories.CreateFile(ctx, repoOwner, sanitizedName, "resources.toml", opts)
 		if err != nil {
 			return fmt.Errorf("failed to create file in repository: %v", err)
 		}
@@ -354,8 +640,8 @@ func (r *UserResource) createGitHubRepository(ctx context.Context, repoName stri
 
 // Delete GitHub repository
 func (r *UserResource) deleteGitHubRepository(ctx context.Context, repoName string) error {
-	// Sanitize the repository name
-	sanitizedName := sanitizeRepoName(repoName)
+	// Sanitize the repository name and append _syncresources
+	sanitizedName := sanitizeRepoName(repoName) + "_syncresources"
 	
 	// Use the token from the provider configuration
 	ts := oauth2.StaticTokenSource(
@@ -403,6 +689,9 @@ func sanitizeRepoName(name string) string {
 
 // Add this new method to update the file in the repository
 func (r *UserResource) updateFileInRepository(ctx context.Context, repoName, owner, fileContents string) error {
+	// Append _syncresources to the repo name
+	repoName = repoName + "_syncresources"
+	
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: r.githubToken},
 	)
@@ -425,13 +714,13 @@ func (r *UserResource) updateFileInRepository(ctx context.Context, repoName, own
 		ctx,
 		owner,
 		repoName,
-		"contents.txt",
+		"resources.toml", // Changed from contents.txt to resources.toml
 		&github.RepositoryContentGetOptions{Ref: defaultBranch},
 	)
 	
 	// Create update options
 	opts := &github.RepositoryContentFileOptions{
-		Message:   github.String("Update contents.txt via Terraform"),
+		Message:   github.String("Update resources.toml via Terraform"),
 		Content:   []byte(fileContents),
 		Branch:    github.String(defaultBranch),
 		Committer: &github.CommitAuthor{
@@ -445,7 +734,7 @@ func (r *UserResource) updateFileInRepository(ctx context.Context, repoName, own
 		opts.SHA = fileContent.SHA
 	}
 	
-	_, _, err = client.Repositories.CreateFile(ctx, owner, repoName, "contents.txt", opts)
+	_, _, err = client.Repositories.CreateFile(ctx, owner, repoName, "resources.toml", opts)
 	if err != nil {
 		return fmt.Errorf("failed to update file in repository: %v", err)
 	}
@@ -453,5 +742,146 @@ func (r *UserResource) updateFileInRepository(ctx context.Context, repoName, own
 	return nil
 }
 
+// Helper method to make API calls
+func (r *UserResource) makeAPICall(payload string, url string) error {
+	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
+	if err != nil {
+		return fmt.Errorf("error creating request: %s", err)
+	}
+	
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("X-Api-Key", "K-1q03sMdwpsCVAzXEvPOvEOvU1EuOEeS3hOSijzbi")
+	req.Header.Set("X-Api-Secret", "S-zrvNHdlcUD3DC91v18WFTPJsSVlLRxAVnaa9m1ln")
+	
+	resp, err := r.client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error sending request: %s", err)
+	}
+	defer resp.Body.Close()
+	
+	if resp.StatusCode != http.StatusOK {
+		bodyBytes, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("received non-OK HTTP status: %s, body: %s", resp.Status, string(bodyBytes))
+	}
+	
+	return nil
+}
 
+// Add this helper function to check if a server is available
+func (r *UserResource) waitForServerAvailability(serverName string, maxAttempts int, sleepDuration time.Duration) error {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Create the GetServer payload
+		getServerPayload := fmt.Sprintf(`{
+			"type": "GetServer",
+			"params": {
+				"server": "%s"
+			}
+		}`, serverName)
+		
+		// Make the API call
+		client := &http.Client{}
+		req, err := http.NewRequest("POST", "http://198.12.108.91:9120/read", bytes.NewBuffer([]byte(getServerPayload)))
+		if err != nil {
+			return fmt.Errorf("error creating request: %s", err)
+		}
+		
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", "K-1q03sMdwpsCVAzXEvPOvEOvU1EuOEeS3hOSijzbi")
+		req.Header.Set("X-Api-Secret", "S-zrvNHdlcUD3DC91v18WFTPJsSVlLRxAVnaa9m1ln")
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			// If there's an error, wait and try again
+			time.Sleep(sleepDuration)
+			continue
+		}
+		
+		defer resp.Body.Close()
+		
+		// If we get a 200 OK, the server exists
+		if resp.StatusCode == http.StatusOK {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("error reading response body: %s", err)
+			}
+			
+			// Parse the response to check if the server is properly configured
+			var result map[string]interface{}
+			err = json.Unmarshal(bodyBytes, &result)
+			if err != nil {
+				return fmt.Errorf("error parsing response: %s", err)
+			}
+			
+			// Check if the server has the expected configuration
+			if config, ok := result["config"].(map[string]interface{}); ok {
+				if _, ok := config["address"]; ok {
+					// Server exists and has an address configured
+					return nil
+				}
+			}
+		}
+		
+		// Wait before the next attempt
+		time.Sleep(sleepDuration)
+	}
+	
+	return fmt.Errorf("server %s did not become available after %d attempts", serverName, maxAttempts)
+}
 
+// Add this helper function to check if a server is in OK state
+func (r *UserResource) waitForServerStateEnabled(serverName string, maxAttempts int, sleepDuration time.Duration) error {
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		// Create the GetServerState payload
+		getServerStatePayload := fmt.Sprintf(`{
+			"type": "GetServerState",
+			"params": {
+				"server": "%s"
+			}
+		}`, serverName)
+		
+		// Make the API call
+		client := &http.Client{}
+		req, err := http.NewRequest("POST", "http://198.12.108.91:9120/read", bytes.NewBuffer([]byte(getServerStatePayload)))
+		if err != nil {
+			return fmt.Errorf("error creating request: %s", err)
+		}
+		
+		req.Header.Set("Content-Type", "application/json")
+		req.Header.Set("X-Api-Key", "K-1q03sMdwpsCVAzXEvPOvEOvU1EuOEeS3hOSijzbi")
+		req.Header.Set("X-Api-Secret", "S-zrvNHdlcUD3DC91v18WFTPJsSVlLRxAVnaa9m1ln")
+		
+		resp, err := client.Do(req)
+		if err != nil {
+			// If there's an error, wait and try again
+			time.Sleep(sleepDuration)
+			continue
+		}
+		
+		defer resp.Body.Close()
+		
+		// If we get a 200 OK, check the server state
+		if resp.StatusCode == http.StatusOK {
+			bodyBytes, err := io.ReadAll(resp.Body)
+			if err != nil {
+				return fmt.Errorf("error reading response body: %s", err)
+			}
+			
+			// Parse the response to check the server state
+			var result map[string]interface{}
+			err = json.Unmarshal(bodyBytes, &result)
+			if err != nil {
+				return fmt.Errorf("error parsing response: %s", err)
+			}
+			
+			// Check if the server state is "Ok"
+			if status, ok := result["status"].(string); ok && status == "Ok" {
+				return nil
+			}
+		}
+		
+		// Wait before the next attempt
+		time.Sleep(sleepDuration)
+	}
+	
+	return fmt.Errorf("server %s did not reach OK state after %d attempts", serverName, maxAttempts)
+}
