@@ -38,6 +38,7 @@ output "security_group_name" {
 output "key_pair_name" {
   description = "The name of the AWS key pair (if created)"
   value       = var.ssh_public_key != "" ? aws_key_pair.client_key[0].key_name : "No key pair created"
+  sensitive   = true
 }
 
 # Output the client configuration ID
