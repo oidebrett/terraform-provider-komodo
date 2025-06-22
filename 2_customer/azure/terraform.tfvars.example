@@ -1,0 +1,43 @@
+# Copy this file to terraform.tfvars and fill in your actual values
+# Do not commit terraform.tfvars to version control!
+
+# Azure Configuration
+azure_subscription_id = "your-subscription-id"
+azure_client_id       = "your-client-id"
+azure_client_secret   = "your-client-secret"
+azure_tenant_id       = "your-tenant-id"
+azure_location        = "East US"
+
+# Instance Configuration
+instance_name = "azure-client-instance"
+vm_size       = "Standard_B2s"
+client_name   = "MyClient"
+client_id     = "1"
+
+# SSH Configuration
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB... your-ssh-key-here"
+ssh_username   = "adminuser"
+
+# Application Configuration
+domain                  = "yourdomain.com"
+admin_email             = "admin@yourdomain.com"
+admin_username          = "admin@yourdomain.com"
+admin_password          = "your-secure-password"
+admin_subdomain         = "admin"
+crowdsec_enrollment_key = "your-crowdsec-key"
+
+# Database Configuration
+postgres_user     = "admin"
+postgres_password = "your-postgres-password"
+postgres_host     = "pangolin-postgres"
+
+# OAuth Configuration
+oauth_client_id     = "your-oauth-client-id"
+oauth_client_secret = "your-oauth-client-secret"
+
+# Custom Provider Configuration
+myuserprovider_endpoint = "http://your-endpoint:9120"
+github_token            = "your-github-token"
+
+# Repository Configuration
+github_repo = "your-username/your-repo"

@@ -27,6 +27,11 @@ server = "server-${client_name_lower}"
 files_on_host = true
 reclone = true
 run_directory = "/etc/komodo/stacks/${client_name_lower}_pangolin-setup"
+post_deploy.command = """
+  # Add multiple commands on new lines. Supports comments.
+  chmod +x initialize_postgres.sh
+  ./initialize_postgres.sh
+"""
 
 [[procedure]]
 name = "${client_name}_ProcedureApply"
