@@ -1,4 +1,4 @@
-module example.com/me/myuserprovider
+module example.com/me/komodo-provider
 
 go 1.23.0
 

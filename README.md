@@ -1,13 +1,6 @@
 How To Create a Terraform Provider — a Guide for Absolute Beginners
 ===================================================================
 
-![Tristan Cartledge](/_next/image?url=%2Fassets%2Fauthor-headshots%2Ftristan.jpeg&w=1920&q=75)
-
-Tristan Cartledge
-
-March 13, 2024
-
-![How To Create a Terraform Provider — a Guide for Absolute Beginners](/_next/image?url=%2Fassets%2Fapi-advice-how-to-create-a-TF-provider.png&w=1920&q=85)
 
 This tutorial shows you how to create a simple Terraform provider for your web service.
 
@@ -27,17 +20,14 @@ Create a folder on your computer to work in. Open a terminal in the folder and r
 
 touch Dockerfile
 
-mkdir 1\_webservice
+mkdir \-p examples
 
-mkdir 2\_customer
+mkdir \-p provider/internal/provider
 
-mkdir \-p 3\_provider/internal/provider
 
-The `1_webservice` folder represents the service that your company sells online. In this example, we’ll have an API that can add and remove users. This service can be in any programming language.
+The `example` folder represents how your users will call Terraform to talk to your service. This folder will hold a Terraform resource configuration file.
 
-The `2_customer` folder represents how your users will call Terraform to talk to your service. This folder will hold a Terraform resource configuration file.
-
-The `3_provider` folder is the custom Terraform provider that will let Terraform talk to your web service. This provider will have three files in Go (Terraform uses only Go for plugins).
+The `provider` folder is the custom Terraform provider that will let Terraform talk to your web service. This provider will have three files in Go (Terraform uses only Go for plugins).
 
 Add the text below to the `Dockerfile`.
 
@@ -69,199 +59,17 @@ docker run \-it --volume .:/workspace \--name tbox timage
 
 \# if you stop the container and want to restart it later, run: docker start -ai tbox
 
-Create the Web Service[](#create-the-web-service)
--------------------------------------------------
-
-Since we’ll write the Terraform provider in Go, let’s create a basic web service in Go, too.
-
-Terraform uses CRUD (create, read, update, and delete) operations to manage any resource in any system, from AWS and Azure to your company’s finance, software, or healthcare product.
-
-In the `1_webservice` folder, create a single-file service that allows a customer to create users with an ID and name, and update and delete users. Run the commands below in the Docker container terminal:
-
-cd /workspace/1\_webservice
-
-go mod init main
-
-go get github.com/go-chi/chi/v5
-
-touch main.go
-
-These commands create a `go.mod` file in the folder and add the `chi` web framework dependency.
-
-In a text editor, copy the code below into `main.go`.
-
-package main
-
-import (
-
-	"fmt"
-
-	"io"
-
-	"net/http"
-
-	"sync"
-
-	"github.com/go-chi/chi/v5"
-
-)
-
-var users \= make(map\[string\]string) // Map to store users with id as key and name as value
-
-var mutex \= &sync.RWMutex{}         // Mutex to protect access to the map as server is multithreaded
-
-func main() {
-
-	router := chi.NewRouter()
-
-	router.Post("/{id}", func(response http.ResponseWriter, request \*http.Request) {
-
-		id := chi.URLParam(request, "id")
-
-		name, err := io.ReadAll(request.Body)
-
-		if err != nil {
-
-			http.Error(response, "Failed to read request body", http.StatusBadRequest)
-
-			return
-
-		}
-
-		mutex.Lock()
-
-		defer mutex.Unlock()
-
-		users\[id\] \= string(name)
-
-		fmt.Fprintf(response, "%s", string(name))
-
-		fmt.Println("POST: ", id, " ", string(name))
-
-	})
-
-This code imports parts of the Go standard library related to HTTP and the `chi` web framework.
-
-The code then makes a variable called `users` to hold the IDs and names of users. As we aren’t using a database here, this will work only as long as the service is running, and all users will be lost when the service stops.
-
-We then create a mutex to handle safe writing to the users lists. Go is multithreaded, so we need a mutex to allow each HTTP handler to check that no other thread is trying to update the users list at the same time.
-
-Finally, we have an HTTP `POST` handler to set a user in the list. To keep this guide short, we do no fancy checks for existing users or errors. The service overwrites items in the list with `users[id] = string(name)`. The function returns plain text (not JSON) to the caller with `fmt.Fprintf(response, "%s", string(name))`. The last line prints to the console to show that it’s working.
-
-So far, we have only a `Create` handler with the `Post` method. Let’s add read, update, and delete. Append the code below to `main.go`.
-
-  router.Get("/{id}", func(response http.ResponseWriter, request \*http.Request) {
-
-		id := chi.URLParam(request, "id")
-
-		mutex.RLock()
-
-		defer mutex.RUnlock()
-
-		name, ok := users\[id\]
-
-		if !ok {
-
-			http.NotFound(response, request)
-
-			return
-
-		}
-
-		fmt.Fprintf(response, "%s", name)
-
-		fmt.Println("GET: ", id, " ", name)
-
-	})
-
-	router.Put("/{id}", func(response http.ResponseWriter, request \*http.Request) {
-
-		id := chi.URLParam(request, "id")
-
-		name, err := io.ReadAll(request.Body)
-
-		if err != nil {
-
-			http.Error(response, "Failed to read request body", http.StatusBadRequest)
-
-			return
-
-		}
-
-		mutex.Lock()
-
-		defer mutex.Unlock()
-
-		if \_, ok := users\[id\]; !ok {
-
-			http.NotFound(response, request)
-
-			return
-
-		}
-
-		users\[id\] \= string(name)
-
-		fmt.Fprintf(response, "%s", string(name))
-
-		fmt.Println("PUT: ", id, " ", users\[id\])
-
-	})
-
-	router.Delete("/{id}", func(response http.ResponseWriter, request \*http.Request) {
-
-		id := chi.URLParam(request, "id")
-
-		mutex.Lock()
-
-		defer mutex.Unlock()
-
-		name, ok := users\[id\]
-
-		if !ok {
-
-			http.NotFound(response, request)
-
-			return
-
-		}
-
-		delete(users, id)
-
-		fmt.Fprintf(response, "%s", name)
-
-		fmt.Println("PUT: ", id, " ", users\[id\])
-
-	})
-
-	http.ListenAndServe(":6251", router)
-
-}
-
-Test the service by running the commands below.
-
-go run main.go &
-
-curl \-X POST \-d "Jane" http://localhost:6251/2
-
-curl http://localhost:6251/2
-
-This series of commands starts the service in the background, creates a user `[2,Jane]`, and retrieves the user from the service.
-
-To stop and restart the background service, run the command below:
-
-killall main; go run main.go &
 
 Create a Terraform Configuration File[](#create-a-terraform-configuration-file)
 -------------------------------------------------------------------------------
 
-So you have a web service, and in reality, you might even have an SDK in Python, Go, Java, and other languages that your customers could use to call your service. Why do you need Terraform, too?
+So we have a backup komodo API, and in reality, you could use the API to call your service. Why do you need Terraform, too?
 
-We answer this question in detail in [our blog post about using Terraform as a SaaS API interface](/post/build-terraform-providers). In summary, Terraform allows your customers to manage multiple environments with a single service (Terraform) through declarative configuration files that can be stored in Git. This means that if one of your customers wants to add a new user or a whole new franchise, they can copy a Terraform resource configuration file from an existing franchise, update it, check it into GitHub, and get it approved. Then Terraform can run it automatically using continuous integration. This has benefits for your customers in terms of speed, safety, repeatability, auditing, and correctness.
+In summary, Terraform allows your customers to manage multiple environments with a single service (Terraform) through declarative configuration files that can be stored in Git. This means that if one of your customers wants to add a stack or VPS, they can copy a Terraform resource configuration file from an existing conf, update it, check it into GitHub, and get it approved. Then Terraform can run it automatically using continuous integration. This has benefits for your customers in terms of speed, safety, repeatability, auditing, and correctness.
 
 Let’s create a Terraform configuration file to demonstrate this now. Run the commands below:
 
-cd /workspace/2\_customer
+cd /workspace/examples
 
 touch main.tf
 
@@ -273,9 +81,9 @@ terraform {
 
   required\_providers {
 
-    myuserprovider \= {
+    komodo-provider \= {
 
-      source  \= "example.com/me/myuserprovider"
+      source  \= "example.com/me/komodo-provider"
 
       \# version = "~> 1.0"
 
@@ -287,7 +95,7 @@ terraform {
 
 \# configure the provider
 
-provider "myuserprovider" {
+provider "komodo-provider" {
 
   endpoint \= "http://localhost:6251/"
 
@@ -295,7 +103,7 @@ provider "myuserprovider" {
 
 \# configure the resource
 
-resource "myuserprovider\_user" "john\_doe" {
+resource "komodo-provider\_user" "john\_doe" {
 
   id   \= "1"
 
@@ -303,7 +111,7 @@ resource "myuserprovider\_user" "john\_doe" {
 
 }
 
-In the first section, we tell Terraform that it will need to use a custom provider to interact with our service, `example.com/me/myuserprovider`. We name the service `myuserprovider`.
+In the first section, we tell Terraform that it will need to use a custom provider to interact with our service, `example.com/me/komodo-provider`. We name the service `komodo-provider`.
 
 In the second section, we configure this provider with the URL of the web service.
 
@@ -316,7 +124,7 @@ Create a Custom Terraform Provider[](#create-a-custom-terraform-provider)
 
 Run the commands below:
 
-cd /workspace/3\_provider
+cd /workspace/provider
 
 touch go.mod
 
@@ -324,7 +132,7 @@ Here we create `go.mod` manually because a Terraform provider needs a lot of dep
 
 Add the text below to `go.mod`.
 
-module example.com/me/myuserprovider
+module example.com/me/komodo-provider
 
 go 1.21
 
@@ -478,13 +286,13 @@ require (
 
 )
 
-Note the module name at the top of the file, `module example.com/me/myuserprovider`. This name consists of an example URL to make the module globally unique, and the name used for the provider in the `main.tf` file — `myuserprovider`.
+Note the module name at the top of the file, `module example.com/me/komodo-provider`. This name consists of an example URL to make the module globally unique, and the name used for the provider in the `main.tf` file — `komodo-provider`.
 
 There are only three code files that are essential to create a provider. They are each presented in a subsection below.
 
 ### The `main.go` File[](#the-maingo-file)
 
-The first file you need is `main.go`. Create it in `/workspace/3_provider/main.go` and add the code below to it:
+The first file you need is `main.go`. Create it in `/workspace/provider/main.go` and add the code below to it:
 
 package main
 
@@ -494,7 +302,7 @@ import (
 
 	"log"
 
-	"example.com/me/myuserprovider/internal/provider"
+	"example.com/me/komodo-provider/internal/provider"
 
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
 
@@ -504,7 +312,7 @@ func main() {
 
 	opts := providerserver.ServeOpts{
 
-		Address: "example.com/me/myuserprovider",
+		Address: "example.com/me/komodo-provider",
 
 	}
 
@@ -524,7 +332,7 @@ Providers are structured like a Go web service. Functions receive a `context`, w
 
 ### The `provider.go` File[](#the-providergo-file)
 
-Create a `3_provider/internal/provider/provider.go` file and add the code below to it:
+Create a `provider/internal/provider/provider.go` file and add the code below to it:
 
 package provider
 
@@ -548,13 +356,13 @@ import (
 
 )
 
-type UserProviderModel struct {
+type KomodoProviderModel struct {
 
 	Endpoint tftypes.String \`tfsdk:"endpoint"\`
 
 }
 
-type UserProvider struct {
+type KomodoProvider struct {
 
 	endpoint string
 
@@ -562,15 +370,15 @@ type UserProvider struct {
 
 }
 
-var \_ tfprovider.Provider \= &UserProvider{}
+var \_ tfprovider.Provider \= &KomodoProvider{}
 
-var \_ tfprovider.ProviderWithFunctions \= &UserProvider{}
+var \_ tfprovider.ProviderWithFunctions \= &KomodoProvider{}
 
 func New() func() tfprovider.Provider {
 
 	return func() tfprovider.Provider {
 
-		return &UserProvider{}
+		return &KomodoProvider{}
 
 	}
 
@@ -579,20 +387,20 @@ func New() func() tfprovider.Provider {
 This code does the following:
 
 *   Imports the Terraform Go framework.
-*   Defines a `UserProviderModel` struct with an `endpoint`. This endpoint will come from the `main.tf` configuration file (the URL of your web service).
-*   Defines a `UserProvider` struct that holds any data the provider needs throughout its life. In our case, we need only the web service URL and an HTTP client that we can pass to the resource manager (created in the next section).
-*   Checks that `UserProvider` correctly implements all the functions Terraform needs in `var _ tfprovider.Provider = &UserProvider{}`. It creates a discarded `_` variable and assigns it the type `tfprovider.Provider` so that the Go compiler can verify it.
+*   Defines a `KomodoProviderModel` struct with an `endpoint`. This endpoint will come from the `main.tf` configuration file (the URL of your web service).
+*   Defines a `KomodoProvider` struct that holds any data the provider needs throughout its life. In our case, we need only the web service URL and an HTTP client that we can pass to the resource manager (created in the next section).
+*   Checks that `KomodoProvider` correctly implements all the functions Terraform needs in `var _ tfprovider.Provider = &KomodoProvider{}`. It creates a discarded `_` variable and assigns it the type `tfprovider.Provider` so that the Go compiler can verify it.
 *   Defines a `New()` function to return an instance of our provider. This function was called in the previous file in the provider server.
 
 Next, add the functions below to the `provider.go` file:
 
-func (p \*UserProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp \*tfprovider.MetadataResponse) {
+func (p \*KomodoProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp \*tfprovider.MetadataResponse) {
 
-	resp.TypeName \= "myuserprovider" // matches in your .tf file \`resource "myuserprovider\_user" "john\_doe" {\`
+	resp.TypeName \= "komodo-provider" // matches in your .tf file \`resource "komodo-provider\_user" "john\_doe" {\`
 
 }
 
-func (p \*UserProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest, resp \*tfprovider.SchemaResponse) {
+func (p \*KomodoProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest, resp \*tfprovider.SchemaResponse) {
 
 	resp.Schema \= tfschema.Schema{
 
@@ -612,9 +420,9 @@ func (p \*UserProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest
 
 }
 
-func (p \*UserProvider) Configure(ctx context.Context, req tfprovider.ConfigureRequest, resp \*tfprovider.ConfigureResponse) {
+func (p \*KomodoProvider) Configure(ctx context.Context, req tfprovider.ConfigureRequest, resp \*tfprovider.ConfigureResponse) {
 
-	var data UserProviderModel
+	var data KomodoProviderModel
 
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 
@@ -634,23 +442,23 @@ func (p \*UserProvider) Configure(ctx context.Context, req tfprovider.ConfigureR
 
 }
 
-func (p \*UserProvider) Resources(ctx context.Context) \[\]func() tfresource.Resource {
+func (p \*KomodoProvider) Resources(ctx context.Context) \[\]func() tfresource.Resource {
 
 	return \[\]func() tfresource.Resource{
 
-		NewUserResource,
+		NewKomodoResource,
 
 	}
 
 }
 
-func (p \*UserProvider) DataSources(ctx context.Context) \[\]func() tfdatasource.DataSource {
+func (p \*KomodoProvider) DataSources(ctx context.Context) \[\]func() tfdatasource.DataSource {
 
 	return \[\]func() tfdatasource.DataSource{}
 
 }
 
-func (p \*UserProvider) Functions(ctx context.Context) \[\]func() tffunction.Function {
+func (p \*KomodoProvider) Functions(ctx context.Context) \[\]func() tffunction.Function {
 
 	return \[\]func() tffunction.Function{}
 
@@ -658,12 +466,12 @@ func (p \*UserProvider) Functions(ctx context.Context) \[\]func() tffunction.Fun
 
 *   `Metadata()` contains the name of the provider.
 *   `Schema()` must match the `main.tf` file so that Terraform can get the configuration settings for the provider.
-*   `Configure()` gets the settings from the configuration file, creates an HTTP client, saves the settings to the `UserProvider` struct, and adds them to the method’s response type. We set `ResourceData` so that the resource manager has access to all the fields of the `UserProvider` struct.
-*   `Resources()` creates a single `NewUserResource` instance. The `NewUserResource` function returns a `UserResource` type, which is what interacts with the users in the web service, and we create it in the next subsection. Since our provider doesn’t manage any `DataSources`, we don’t create any.
+*   `Configure()` gets the settings from the configuration file, creates an HTTP client, saves the settings to the `KomodoProvider` struct, and adds them to the method’s response type. We set `ResourceData` so that the resource manager has access to all the fields of the `KomodoProvider` struct.
+*   `Resources()` creates a single `NewKomodoResource` instance. The `NewKomodoResource` function returns a `KomodoResource` type, which is what interacts with the users in the web service, and we create it in the next subsection. Since our provider doesn’t manage any `DataSources`, we don’t create any.
 
-### The `userResource.go` File[](#the-userresourcego-file)
+### The `komodoResource.go` File[](#the-komodoResourcego-file)
 
-Create a `3_provider/internal/provider/userResource.go` file and add the code below to it:
+Create a `provider/internal/provider/komodoResource.go` file and add the code below to it:
 
 package provider
 
@@ -689,11 +497,11 @@ import (
 
 )
 
-var \_ tfresource.Resource \= &UserResource{}
+var \_ tfresource.Resource \= &komodoResource{}
 
-var \_ tfresource.ResourceWithImportState \= &UserResource{}
+var \_ tfresource.ResourceWithImportState \= &komodoResource{}
 
-type UserResource struct {
+type komodoResource struct {
 
 	client   \*http.Client
 
@@ -701,7 +509,7 @@ type UserResource struct {
 
 }
 
-type UserModel struct {
+type KomodoModel struct {
 
 	Id   tftypes.String \`tfsdk:"id"\`
 
@@ -709,25 +517,25 @@ type UserModel struct {
 
 }
 
-func NewUserResource() tfresource.Resource {
+func NewKomodoResource() tfresource.Resource {
 
-	return &UserResource{}
+	return &komodoResource{}
 
 }
 
 This code is similar to the code in the previous file we created. It loads dependencies, checks the interfaces compile, and defines the struct the resource will use.
 
-Note the `UserModel`. This struct is what will communicate between the web service and Terraform core. Terraform will save the values here for `Id` and `Name` into a local state file that mimics what Terraform thinks the web service state is. Terraform uses its own types to do this, `terraform-plugin-framework/types`, not plain Go types.
+Note the `KomodoModel`. This struct is what will communicate between the web service and Terraform core. Terraform will save the values here for `Id` and `Name` into a local state file that mimics what Terraform thinks the web service state is. Terraform uses its own types to do this, `terraform-plugin-framework/types`, not plain Go types.
 
 Next, add the code below to allow the resource to configure itself:
 
-func (r \*UserResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp \*tfresource.MetadataResponse) {
+func (r \*komodoResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp \*tfresource.MetadataResponse) {
 
-	resp.TypeName \= req.ProviderTypeName + "\_user" // matches in main.tf: resource "myuserprovider\_user" "john\_doe" {
+	resp.TypeName \= req.ProviderTypeName + "\_user" // matches in main.tf: resource "komodo-provider\_user" "john\_doe" {
 
 }
 
-func (r \*UserResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp \*tfresource.SchemaResponse) {
+func (r \*komodoResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp \*tfresource.SchemaResponse) {
 
 	resp.Schema \= tfschema.Schema{
 
@@ -757,7 +565,7 @@ func (r \*UserResource) Schema(ctx context.Context, req tfresource.SchemaRequest
 
 }
 
-func (r \*UserResource) Configure(ctx context.Context, req tfresource.ConfigureRequest, resp \*tfresource.ConfigureResponse) {
+func (r \*komodoResource) Configure(ctx context.Context, req tfresource.ConfigureRequest, resp \*tfresource.ConfigureResponse) {
 
 	if req.ProviderData \== nil { // this means the provider.go Configure method hasn't been called yet, so wait longer
 
@@ -765,7 +573,7 @@ func (r \*UserResource) Configure(ctx context.Context, req tfresource.ConfigureR
 
 	}
 
-	provider, ok := req.ProviderData.(\*UserProvider)
+	provider, ok := req.ProviderData.(\*KomodoProvider)
 
 	if !ok {
 
@@ -789,7 +597,7 @@ func (r \*UserResource) Configure(ctx context.Context, req tfresource.ConfigureR
 
 Again, this code looks similar to the code in the previous file.
 
-*   Note how the `Metadata()` function combines the provider and resource names with `_` in `myuserprovider_user`. This matches the name in `main.tf` and is a Terraform naming standard.
+*   Note how the `Metadata()` function combines the provider and resource names with `_` in `komodo-provider_user`. This matches the name in `main.tf` and is a Terraform naming standard.
 *   `Schema()` defines what Terraform will remember about the remote resource in local state.
 *   `Configure()` gets the information from the provider we configured in the `provider.go` file in the `Configure()` method, `resp.ResourceData = p`. It receives an HTTP client and URL from the provider to use in the resource manager.
 
@@ -797,9 +605,9 @@ The `if req.ProviderData == nil` line is essential. Terraform can load the resou
 
 The last code you need to add to `userProvider.go` is the heart of the provider: Calling the web service with CRUD functions and returning the response to Terraform to update its state. This code is also the easiest to understand. We’ll explain the `Create` function after you’ve added the code below. The other functions are similar.
 
-func (r \*UserResource) Create(ctx context.Context, req tfresource.CreateRequest, resp \*tfresource.CreateResponse) {
+func (r \*komodoResource) Create(ctx context.Context, req tfresource.CreateRequest, resp \*tfresource.CreateResponse) {
 
-	var state UserModel
+	var state KomodoModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 
@@ -845,9 +653,9 @@ func (r \*UserResource) Create(ctx context.Context, req tfresource.CreateRequest
 
 }
 
-func (r \*UserResource) Read(ctx context.Context, req tfresource.ReadRequest, resp \*tfresource.ReadResponse) {
+func (r \*komodoResource) Read(ctx context.Context, req tfresource.ReadRequest, resp \*tfresource.ReadResponse) {
 
-	var state UserModel
+	var state KomodoModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 
@@ -901,9 +709,9 @@ func (r \*UserResource) Read(ctx context.Context, req tfresource.ReadRequest, re
 
 }
 
-func (r \*UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp \*tfresource.DeleteResponse) {
+func (r \*komodoResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp \*tfresource.DeleteResponse) {
 
-	var data UserModel
+	var data KomodoModel
 
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 
@@ -951,9 +759,9 @@ func (r \*UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest
 
 }
 
-func (r \*UserResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp \*tfresource.UpdateResponse) {
+func (r \*komodoResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp \*tfresource.UpdateResponse) {
 
-	var state UserModel
+	var state KomodoModel
 
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 
@@ -1007,7 +815,7 @@ func (r \*UserResource) Update(ctx context.Context, req tfresource.UpdateRequest
 
 }
 
-func (r \*UserResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp \*tfresource.ImportStateResponse) {
+func (r \*komodoResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp \*tfresource.ImportStateResponse) {
 
 	tfresource.ImportStatePassthroughID(ctx, tfpath.Root("id"), req, resp)
 
@@ -1029,7 +837,7 @@ Run the Provider[](#run-the-provider)
 Let’s recapitulate. You’ve:
 
 *   Created a one-file web service to manage users that represents your company’s product that you sell to customers.
-*   Created a `main.tf` Terraform configuration file to say that you want to use the `myuserprovider` provider to create a user called “John Doe” using the web service.
+*   Created a `main.tf` Terraform configuration file to say that you want to use the `komodo-provider` provider to create a user called “John Doe” using the web service.
 *   Created a Terraform provider with three files: a provider server, a provider, and a user resource manager.
 
 Now it’s time to run Terraform pretending that you’re one of your customers calling your web service and check that your provider works with the configuration file.
@@ -1048,7 +856,7 @@ provider\_installation {
 
     dev\_overrides {
 
-        "example.com/me/myuserprovider" \= "/workspace/3\_provider/bin"
+        "example.com/me/komodo-provider" \= "/workspace/3\_provider/bin"
 
     }
 
@@ -1066,7 +874,7 @@ cd /workspace/3\_provider
 
 go mod tidy \# download dependencies
 
-go build \-o ./bin/terraform-provider-myuserprovider
+go build \-o ./bin/terraform-provider-komodo-provider
 
 cd /workspace/2\_customer
 
@@ -1082,9 +890,9 @@ Terraform used the selected providers to generate the following execution plan. 
 
 Terraform will perform the following actions:
 
-  \# myuserprovider\_user.john\_doe will be created
+  \# komodo-provider\_user.john\_doe will be created
 
-  + resource "myuserprovider\_user" "john\_doe" {
+  + resource "komodo-provider\_user" "john\_doe" {
 
       + id   = "1"
 
@@ -1094,23 +902,23 @@ Terraform will perform the following actions:
 
 Plan: 1 to add, 0 to change, 0 to destroy.
 
-myuserprovider\_user.john\_doe: Creating...
+komodo-provider\_user.john\_doe: Creating...
 
 POST:  1   John Doe
 
-myuserprovider\_user.john\_doe: Creation complete after 0s \[id=1\]
+komodo-provider\_user.john\_doe: Creation complete after 0s \[id=1\]
 
 Apply complete! Resources: 1 added, 0 changed, 0 destroyed.
 
 (If you’ve used Terraform before and are used to running `terraform init`, that won’t work with the `dev_overrides` setting. The `Init` command isn’t necessary because there’s no need to download any plugins.)
 
-If you need to do any debugging while working on the provider, set the environment variable for logging in the terminal with `export TF_LOG=WARN`, and ask Terraform to write information to the terminal in your `userResource.go` with:
+If you need to do any debugging while working on the provider, set the environment variable for logging in the terminal with `export TF_LOG=WARN`, and ask Terraform to write information to the terminal in your `komodoResource.go` with:
 
 import "github.com/hashicorp/terraform-plugin-log/tflog" // at the top
 
 tflog.Info(ctx, "We are inside CREATE\\n") // in a function
 
-Notice that Terraform created `/workspace/2_customer/terraform.tfstate`. This state file holds what Terraform thinks the remote state is. Never alter this file manually. If you need to update Terraform state because you added users directly through the web service, you’ll need to implement the Terraform `import` command.
+Notice that Terraform created `/workspace/examples/terraform.tfstate`. This state file holds what Terraform thinks the remote state is. Never alter this file manually. If you need to update Terraform state because you added users directly through the web service, you’ll need to implement the Terraform `import` command.
 
 Experiment to see how Terraform calls the CRUD functions depending on how you change your state. Add more users to the `main.tf` file, change their names, call `curl -X POST -d "Jane" http://localhost:6251/1` to try to confuse Terraform, and see how it handles the changes.
 
@@ -1119,7 +927,7 @@ Limitations and Further Reading[](#limitations-and-further-reading)
 
 You’re done with writing code for this guide and now have a working minimal example of a Terraform provider that you can enhance. But this provider isn’t ready for production use yet. There are features you’ll probably want to add, for example:
 
-*   Markup responses (JSON or XML). This simplistic web service currently returns either a 404 or a string containing a user name directly in the response body. In reality, you’ll use a markup language. You may even want to have your `userResource` call a Go SDK for your service instead of making web calls directly.
+*   Markup responses (JSON or XML). This simplistic web service currently returns either a 404 or a string containing a user name directly in the response body. In reality, you’ll use a markup language. You may even want to have your `komodoResource` call a Go SDK for your service instead of making web calls directly.
 *   Versioning and continuous integration. Your web service will change over time. The provider will need to change to match it. Your customers will need to use the correct versions of each. You will also want to automatically build and release your provider from GitHub, using GitHub actions.
 *   Testing. A real web service is complex, and you will need to write a lot of integration tests to ensure that every provider version you release does exactly what it’s supposed to when calling the service.
 *   Documentation. Your customers want to know exactly how to set up and configure your provider to manage whatever resources your service offers.

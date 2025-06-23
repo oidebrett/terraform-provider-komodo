@@ -13,33 +13,33 @@ import (
 	tftypes "github.com/hashicorp/terraform-plugin-framework/types"
 )
 
-type UserProviderModel struct {
+type KomodoProviderModel struct {
 	Endpoint     tftypes.String `tfsdk:"endpoint"`
 	GithubToken  tftypes.String `tfsdk:"github_token"`
 	GithubOrgname tftypes.String `tfsdk:"github_orgname"` // Changed from github_username
 }
 
-type UserProvider struct {
+type KomodoProvider struct {
 	endpoint      string
 	githubToken   string
 	githubOrgname string // Changed from githubUsername
 	client        *http.Client
 }
 
-var _ tfprovider.Provider = &UserProvider{}
-var _ tfprovider.ProviderWithFunctions = &UserProvider{}
+var _ tfprovider.Provider = &KomodoProvider{}
+var _ tfprovider.ProviderWithFunctions = &KomodoProvider{}
 
 func New() func() tfprovider.Provider {
 	return func() tfprovider.Provider {
-		return &UserProvider{}
+		return &KomodoProvider{}
 	}
 }
 
-func (p *UserProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {
-	resp.TypeName = "myuserprovider" // matches in your .tf file `resource "myuserprovider_user" "john_doe" {`
+func (p *KomodoProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {
+	resp.TypeName = "komodo-provider" // matches in your .tf file `resource "komodo-provider_user" "john_doe" {`
 }
 
-func (p *UserProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest, resp *tfprovider.SchemaResponse) {
+func (p *KomodoProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest, resp *tfprovider.SchemaResponse) {
 	resp.Schema = tfschema.Schema{
 		Attributes: map[string]tfschema.Attribute{
 			"endpoint": tfschema.StringAttribute{
@@ -59,8 +59,8 @@ func (p *UserProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest,
 	}
 }
 
-func (p *UserProvider) Configure(ctx context.Context, req tfprovider.ConfigureRequest, resp *tfprovider.ConfigureResponse) {
-	var data UserProviderModel
+func (p *KomodoProvider) Configure(ctx context.Context, req tfprovider.ConfigureRequest, resp *tfprovider.ConfigureResponse) {
+	var data KomodoProviderModel
 	resp.Diagnostics.Append(req.Config.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -81,17 +81,17 @@ func (p *UserProvider) Configure(ctx context.Context, req tfprovider.ConfigureRe
 	resp.ResourceData = p
 }
 
-func (p *UserProvider) Resources(ctx context.Context) []func() tfresource.Resource {
+func (p *KomodoProvider) Resources(ctx context.Context) []func() tfresource.Resource {
 	return []func() tfresource.Resource{
-		NewUserResource,
+		NewKomodoResource,
 	}
 }
 
-func (p *UserProvider) DataSources(ctx context.Context) []func() tfdatasource.DataSource {
+func (p *KomodoProvider) DataSources(ctx context.Context) []func() tfdatasource.DataSource {
 	return []func() tfdatasource.DataSource{}
 }
 
-func (p *UserProvider) Functions(ctx context.Context) []func() tffunction.Function {
+func (p *KomodoProvider) Functions(ctx context.Context) []func() tffunction.Function {
 	return []func() tffunction.Function{}
 }
 

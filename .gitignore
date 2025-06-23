@@ -46,7 +46,7 @@ coverage.*
 *.log
 
 # Ignore your own local provider binary (name it below)
-**/terraform-provider-myuserprovider*
+**/terraform-provider-komodo-provider*
 **/terraform-provider-contextware*
 
 **/your-service-account-key.json

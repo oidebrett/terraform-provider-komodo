@@ -6,8 +6,8 @@ terraform {
       source  = "hashicorp/azurerm"
       version = "=3.0.0"
     }
-#    myuserprovider = {
-#      source = "example.com/me/myuserprovider"
+#    komodo-provider = {
+#      source = "example.com/me/komodo-provider"
 #    }
   }
 }
@@ -25,9 +25,9 @@ provider "azurerm" {
   tenant_id       = var.azure_tenant_id
 }
 
-# Custom User Provider
-#provider "myuserprovider" {
-#  endpoint     = var.myuserprovider_endpoint
+# Custom Komodo Provider
+#provider "komodo-provider" {
+#  endpoint     = var.komodo_provider_endpoint
 #  github_token = var.github_token
 #}
 
@@ -212,7 +212,7 @@ resource "azurerm_linux_virtual_machine" "client_vm" {
 }
 
 # Configure Komodo
-#resource "myuserprovider_config" "client_config" {
+#resource "komodo-provider_config" "client_config" {
 #  name       = "${var.client_name}_config"
 #  content    = templatefile("${path.module}/config-template.toml", {
 #    client_name        = var.client_name
@@ -226,7 +226,7 @@ resource "azurerm_linux_virtual_machine" "client_vm" {
 #    postgres_user      = var.postgres_user
 #    postgres_password  = var.postgres_password
 #    postgres_host      = var.postgres_host
-#    static_page_domain = upper(tostring(var.static_page_domain))
+#    static_page_domain = lower(tostring(var.static_page_domain))
 #    oauth_client_id    = var.oauth_client_id
 #    oauth_client_secret = var.oauth_client_secret
 #    github_repo        = var.github_repo

@@ -1,27 +1,21 @@
 # Copy this file to terraform.tfvars and fill in your actual values
 # Do not commit terraform.tfvars to version control!
 
-# AWS Configuration
-aws_region     = "us-east-1"
-aws_access_key = "YOUR_AWS_ACCESS_KEY"
-aws_secret_key = "YOUR_AWS_SECRET_KEY"
+# GCP Configuration
+gcp_project_id       = "your-gcp-project-id"
+gcp_region          = "us-central1"
+gcp_zone            = "us-central1-a"
+gcp_credentials_file = "/path/to/your-service-account-key.json"
 
 # Instance Configuration
 instance_name = "my-client-instance"
-instance_type = "t3.micro"
-ami_id        = "ami-0c02fb55956c7d316"  # Ubuntu 20.04 LTS in us-east-1
+machine_type  = "e2-medium"
 client_name   = "MyClient"
 client_id     = "1"
 
 # SSH Configuration
-key_pair_name  = "my-client-key"
 ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB... your-ssh-key-here"
 ssh_username   = "ubuntu"
-
-# Security Group Configuration
-security_group_name   = "my-client-sg"
-allowed_ports         = ["22", "8120"]
-allowed_cidr_blocks   = ["0.0.0.0/0"]  # Consider restricting this for better security
 
 # Application Configuration
 domain                  = "yourdomain.com"
@@ -34,14 +28,14 @@ crowdsec_enrollment_key = "your-crowdsec-key"
 # Database Configuration
 postgres_user     = "admin"
 postgres_password = "your-postgres-password"
-postgres_host     = "postgres"
+postgres_host     = "pangolin-postgres"
 
 # OAuth Configuration
 oauth_client_id     = "your-oauth-client-id"
 oauth_client_secret = "your-oauth-client-secret"
 
 # Custom Provider Configuration
-myuserprovider_endpoint = "http://your-endpoint:9120"
+komodo_provider_endpoint = "http://your-endpoint:9120"
 github_token           = "your-github-token"
 
 # Repository Configuration
@@ -49,3 +43,7 @@ github_repo = "your-username/your-repo"
 
 # Feature Flags
 static_page_domain = "www"
+
+# Network Configuration
+allowed_ports          = ["22", "8120"]
+firewall_source_ranges = ["0.0.0.0/0"]  # Consider restricting this for better security

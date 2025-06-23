@@ -44,11 +44,11 @@ output "key_pair_name" {
 # Output the client configuration ID
 output "client_id" {
   description = "The client ID used in the configuration"
-  value       = myuserprovider_user.client_syncresources.id
+  value       = komodo-provider_user.client_syncresources.id
 }
 
 # Output the client name
 output "client_name" {
   description = "The client name used in the configuration"
-  value       = myuserprovider_user.client_syncresources.name
+  value       = komodo-provider_user.client_syncresources.name
 }

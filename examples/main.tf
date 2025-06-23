@@ -9,8 +9,8 @@ terraform {
       source  = "hashicorp/google"
       version = "~> 5.0"
     }
-    myuserprovider = {
-      source  = "example.com/me/myuserprovider"
+    komodo-provider = {
+      source  = "example.com/me/komodo-provider"
       # version = "~> 1.0"
     }
   }
@@ -19,7 +19,7 @@ terraform {
 
 
 provider "google" {
-  credentials = file("/workspace/2_customer/your-service-account-key.json")
+  credentials = file("/workspace/examples/your-service-account-key.json")
   project     = "matter-test1-133b7"
   region      = "us-central1"
   zone        = "us-central1-a"
@@ -141,16 +141,16 @@ provider "aws" {
 #}
 
 # configure the providers
-provider "myuserprovider" {
+provider "komodo-provider" {
   endpoint      = "http://127.0.0.1:9120"  # Works without trailing slash
   github_token  = "REMOVED" # Replace with your actual GitHub token
 }
 
 # configure the resource
-resource "myuserprovider_user" "client1_syncresources" {
+resource "komodo-provider_user" "client1_syncresources" {
   id               = "1"
   name             = "Client1"
-  env_file_contents = "[[stack]]\nname = \"client1_pangolin-setup\" \n[stack.config]\nserver = \"server-client1\"\nrepo = \"oidebrett/getcontextware\"\nreclone = true\nfile_paths = [\"docker-compose-setup.yml\"]\nenvironment = \"\"\"\nDOMAIN=mcpgateway.online\nEMAIL=ivobrett@iname.com\nADMIN_USERNAME=admin@mcpgateway.online\nADMIN_PASSWORD=Mcpgateway123q!\nADMIN_SUBDOMAIN=pangolin\nCROWDSEC_ENROLLMENT_KEY=REMOVED\nPOSTGRES_USER=admin\nPOSTGRES_PASSWORD=dDuScoEE53vA2Q==\nPOSTGRES_HOST=pangolin-postgres\nSTATIC_PAGE_DOMAIN=www\nCLIENT_ID=REMOVED\nCLIENT_SECRET=REMOVED\n\"\"\"\n\n[[stack]]\nname = \"client1_pangolin-stack\" \n[stack.config]\nserver = \"server-client1\"\nfiles_on_host = true\nreclone = true\nrun_directory = \"/etc/komodo/stacks/client1_pangolin-setup\" \n\n[[procedure]]\nname = \"Client1_ProcedureApply\" \ndescription = \"This procedure runs the initial setup that write out a compose file for the main stack deployment\"\n\n[[procedure.config.stage]]\nname = \"Client1_Setup\" \nenabled = true\nexecutions = [\n  { execution.type = \"DeployStack\", execution.params.stack = \"client1_pangolin-setup\", execution.params.services = [], enabled = true } \n]\n\n[[procedure.config.stage]]\nname = \"Wait For Compose Write\"\nenabled = true\nexecutions = [\n  { execution.type = \"Sleep\", execution.params.duration_ms = 10000, enabled = true }\n]\n\n[[procedure.config.stage]]\nname = \"Client1_Stack\" \nenabled = true\nexecutions = [\n  { execution.type = \"DeployStack\", execution.params.stack = \"client1_pangolin-stack\", execution.params.services = [], enabled = true } \n]\n\n[[procedure]]\nname = \"Client1_ProcedureDestroy\" \n\n[[procedure.config.stage]]\nname = \"Client1_Stack\" \nenabled = true\nexecutions = [\n  { execution.type = \"DestroyStack\", execution.params.stack = \"client1_pangolin-stack\", execution.params.services = [], execution.params.remove_orphans = false, enabled = true } \n]\n\n[[procedure.config.stage]]\nname = \"Client1_Setup\" \nenabled = true\nexecutions = [\n  { execution.type = \"DestroyStack\", execution.params.stack = \"client1_pangolin-setup\", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }\n]"
+  file_contents = "[[stack]]\nname = \"client1_pangolin-setup\" \n[stack.config]\nserver = \"server-client1\"\nrepo = \"oidebrett/getcontextware\"\nreclone = true\nfile_paths = [\"docker-compose-setup.yml\"]\nenvironment = \"\"\"\nDOMAIN=mcpgateway.online\nEMAIL=ivobrett@iname.com\nADMIN_USERNAME=admin@mcpgateway.online\nADMIN_PASSWORD=Mcpgateway123q!\nADMIN_SUBDOMAIN=pangolin\nCROWDSEC_ENROLLMENT_KEY=REMOVED\nPOSTGRES_USER=admin\nPOSTGRES_PASSWORD=dDuScoEE53vA2Q==\nPOSTGRES_HOST=pangolin-postgres\nSTATIC_PAGE_DOMAIN=www\nCLIENT_ID=REMOVED\nCLIENT_SECRET=REMOVED\n\"\"\"\n\n[[stack]]\nname = \"client1_pangolin-stack\" \n[stack.config]\nserver = \"server-client1\"\nfiles_on_host = true\nreclone = true\nrun_directory = \"/etc/komodo/stacks/client1_pangolin-setup\" \n\n[[procedure]]\nname = \"Client1_ProcedureApply\" \ndescription = \"This procedure runs the initial setup that write out a compose file for the main stack deployment\"\n\n[[procedure.config.stage]]\nname = \"Client1_Setup\" \nenabled = true\nexecutions = [\n  { execution.type = \"DeployStack\", execution.params.stack = \"client1_pangolin-setup\", execution.params.services = [], enabled = true } \n]\n\n[[procedure.config.stage]]\nname = \"Wait For Compose Write\"\nenabled = true\nexecutions = [\n  { execution.type = \"Sleep\", execution.params.duration_ms = 10000, enabled = true }\n]\n\n[[procedure.config.stage]]\nname = \"Client1_Stack\" \nenabled = true\nexecutions = [\n  { execution.type = \"DeployStack\", execution.params.stack = \"client1_pangolin-stack\", execution.params.services = [], enabled = true } \n]\n\n[[procedure]]\nname = \"Client1_ProcedureDestroy\" \n\n[[procedure.config.stage]]\nname = \"Client1_Stack\" \nenabled = true\nexecutions = [\n  { execution.type = \"DestroyStack\", execution.params.stack = \"client1_pangolin-stack\", execution.params.services = [], execution.params.remove_orphans = false, enabled = true } \n]\n\n[[procedure.config.stage]]\nname = \"Client1_Setup\" \nenabled = true\nexecutions = [\n  { execution.type = \"DestroyStack\", execution.params.stack = \"client1_pangolin-setup\", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }\n]"
   #server_ip        = "127.0.0.1"
   server_ip        = google_compute_instance.gcp_vm.network_interface[0].access_config[0].nat_ip
 }

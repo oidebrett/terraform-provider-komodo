@@ -1,52 +1,47 @@
-# GCP Provider Configuration
-variable "gcp_project_id" {
-  description = "The GCP project ID"
+# Azure Provider Configuration
+variable "azure_subscription_id" {
+  description = "The Azure subscription ID"
   type        = string
-  default     = "your-project-id"
+  default     = ""
 }
 
-variable "gcp_region" {
-  description = "The GCP region"
-  type        = string
-  default     = "us-central1"
-}
-
-variable "gcp_zone" {
-  description = "The GCP zone"
-  type        = string
-  default     = "us-central1-a"
-}
-
-variable "gcp_credentials_file" {
-  description = "Path to the GCP service account key file"
+variable "azure_client_id" {
+  description = "The Azure client ID"
   type        = string
   default     = ""
   sensitive   = true
 }
 
+variable "azure_client_secret" {
+  description = "The Azure client secret"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
+variable "azure_tenant_id" {
+  description = "The Azure tenant ID"
+  type        = string
+  default     = ""
+}
+
+variable "azure_location" {
+  description = "The Azure region"
+  type        = string
+  default     = "East US"
+}
+
 # Instance Configuration
 variable "instance_name" {
-  description = "Name of the GCP compute instance"
+  description = "Name of the Azure virtual machine"
   type        = string
-  default     = "gcp-client-instance"
+  default     = "azure-client-instance"
 }
 
-variable "machine_type" {
-  description = "Machine type for the GCP instance"
+variable "vm_size" {
+  description = "Size of the Azure virtual machine"
   type        = string
-  default     = "e2-medium"
-}
-
-variable "instance_image" {
-  description = "Boot disk image for the instance"
-  type        = string
-  default     = "ubuntu-2004-focal-v20240307b"
-}
-
-variable "instance_tags" {
-  description = "Network tags for the instance"
-  type        = list(string)
-  default     = ["gcp-client"]
+  default     = "Standard_B2s"
 }
 
 # SSH Configuration
@@ -60,40 +55,7 @@ variable "ssh_public_key" {
 variable "ssh_username" {
   description = "Username for SSH access"
   type        = string
-  default     = "ubuntu"
-}
-
-# Firewall Configuration
-variable "firewall_name" {
-  description = "Name of the firewall rule"
-  type        = string
-  default     = "allow-ssh-and-8120"
-}
-
-variable "allowed_ports" {
-  description = "List of ports to allow through firewall"
-  type        = list(string)
-  default     = ["22", "8120"]
-}
-
-variable "firewall_source_ranges" {
-  description = "Source IP ranges for firewall rule"
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
-}
-
-# Custom Provider Configuration
-variable "myuserprovider_endpoint" {
-  description = "Endpoint for custom user provider"
-  type        = string
-  default     = "http://127.0.0.1:9120"
-}
-
-variable "github_token" {
-  description = "GitHub token for custom provider"
-  type        = string
-  default     = ""
-  sensitive   = true
+  default     = "adminuser"
 }
 
 # Client Configuration
@@ -147,6 +109,7 @@ variable "crowdsec_enrollment_key" {
   sensitive   = true
 }
 
+# Database Configuration
 variable "postgres_user" {
   description = "PostgreSQL username"
   type        = string
@@ -166,11 +129,18 @@ variable "postgres_host" {
   default     = "postgres"
 }
 
+# Application Configuration
+variable "static_page_domain" {
+  description = "Static page domain"
+  type        = string
+  default     = "www"
+}
+
+# OAuth Configuration
 variable "oauth_client_id" {
   description = "OAuth client ID"
   type        = string
   default     = ""
-  sensitive   = true
 }
 
 variable "oauth_client_secret" {
@@ -180,14 +150,23 @@ variable "oauth_client_secret" {
   sensitive   = true
 }
 
-variable "github_repo" {
-  description = "GitHub repository for deployment"
+# Custom Provider Configuration
+variable "komodo_provider_endpoint" {
+  description = "Custom provider endpoint"
   type        = string
-  default     = "oidebrett/getcontextware"
+  default     = "http://localhost:9120"
 }
 
-variable "static_page_domain" {
-  description = "Static page domain"
+variable "github_token" {
+  description = "GitHub token for repository access"
   type        = string
-  default     = "www"
+  default     = ""
+  sensitive   = true
+}
+
+# Repository Configuration
+variable "github_repo" {
+  description = "GitHub repository for application code"
+  type        = string
+  default     = "username/repo"
 }

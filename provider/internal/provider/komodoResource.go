@@ -20,33 +20,33 @@ import (
 	"golang.org/x/oauth2"
 )
 
-var _ tfresource.Resource = &UserResource{}
-var _ tfresource.ResourceWithImportState = &UserResource{}
+var _ tfresource.Resource = &komodoResource{}
+var _ tfresource.ResourceWithImportState = &komodoResource{}
 
-type UserResource struct {
+type komodoResource struct {
 	client        *http.Client
 	endpoint      string
 	githubToken   string
 	githubOrgname string // Changed from githubUsername
 }
 
-type UserModel struct {
+type KomodoModel struct {
 	Id           tftypes.String `tfsdk:"id"`
 	Name         tftypes.String `tfsdk:"name"`
-	FileContents tftypes.String `tfsdk:"env_file_contents"`
+	FileContents tftypes.String `tfsdk:"file_contents"`
 	ServerIP     tftypes.String `tfsdk:"server_ip"`
 }
 
-func NewUserResource() tfresource.Resource {
-	return &UserResource{}
+func NewKomodoResource() tfresource.Resource {
+	return &komodoResource{}
 }
 
 
-func (r *UserResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
-	resp.TypeName = req.ProviderTypeName + "_user" // matches in main.tf: resource "myuserprovider_user" "john_doe" {
+func (r *komodoResource) Metadata(ctx context.Context, req tfresource.MetadataRequest, resp *tfresource.MetadataResponse) {
+	resp.TypeName = req.ProviderTypeName + "_user" // matches in main.tf: resource "komodo-provider_user" "john_doe" {
 }
 
-func (r *UserResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
+func (r *komodoResource) Schema(ctx context.Context, req tfresource.SchemaRequest, resp *tfresource.SchemaResponse) {
 	resp.Schema = tfschema.Schema{
 		MarkdownDescription: "User resource interacts with user web service",
 		Attributes: map[string]tfschema.Attribute{
@@ -58,8 +58,8 @@ func (r *UserResource) Schema(ctx context.Context, req tfresource.SchemaRequest,
 				MarkdownDescription: "The name of the user",
 				Required:            true,
 			},
-			"env_file_contents": tfschema.StringAttribute{
-				MarkdownDescription: "Contents to write to contents.txt in the GitHub repository",
+			"file_contents": tfschema.StringAttribute{
+				MarkdownDescription: "Contents to write to resources.toml in the GitHub repository",
 				Optional:            true,
 			},
 			"server_ip": tfschema.StringAttribute{
@@ -70,11 +70,11 @@ func (r *UserResource) Schema(ctx context.Context, req tfresource.SchemaRequest,
 	}
 }
 
-func (r *UserResource) Configure(ctx context.Context, req tfresource.ConfigureRequest, resp *tfresource.ConfigureResponse) {
+func (r *komodoResource) Configure(ctx context.Context, req tfresource.ConfigureRequest, resp *tfresource.ConfigureResponse) {
 	if req.ProviderData == nil { // this means the provider.go Configure method hasn't been called yet, so wait longer
 		return
 	}
-	provider, ok := req.ProviderData.(*UserProvider)
+	provider, ok := req.ProviderData.(*KomodoProvider)
 	if !ok {
 		resp.Diagnostics.AddError(
 			"Could not create HTTP client",
@@ -88,8 +88,8 @@ func (r *UserResource) Configure(ctx context.Context, req tfresource.ConfigureRe
 	r.githubOrgname = provider.githubOrgname // Get the GitHub org name
 }
 
-func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
-	var state UserModel
+func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateRequest, resp *tfresource.CreateResponse) {
+	var state KomodoModel
 	resp.Diagnostics.Append(req.Plan.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -229,8 +229,8 @@ func (r *UserResource) Create(ctx context.Context, req tfresource.CreateRequest,
 	resp.State.Set(ctx, &state)
 }
 
-func (r *UserResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
-	var state UserModel
+func (r *komodoResource) Read(ctx context.Context, req tfresource.ReadRequest, resp *tfresource.ReadResponse) {
+	var state KomodoModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &state)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -241,8 +241,8 @@ func (r *UserResource) Read(ctx context.Context, req tfresource.ReadRequest, res
 	resp.Diagnostics.Append(resp.State.Set(ctx, &state)...)
 }
 
-func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
-	var data UserModel
+func (r *komodoResource) Delete(ctx context.Context, req tfresource.DeleteRequest, resp *tfresource.DeleteResponse) {
+	var data KomodoModel
 	resp.Diagnostics.Append(req.State.Get(ctx, &data)...)
 	if resp.Diagnostics.HasError() {
 		return
@@ -384,9 +384,9 @@ func (r *UserResource) Delete(ctx context.Context, req tfresource.DeleteRequest,
 	resp.Diagnostics.Append(resp.State.Set(ctx, &data)...)
 }
 
-func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
-	var state UserModel
-	var oldState UserModel
+func (r *komodoResource) Update(ctx context.Context, req tfresource.UpdateRequest, resp *tfresource.UpdateResponse) {
+	var state KomodoModel
+	var oldState KomodoModel
 	
 	// Get the current state
 	resp.Diagnostics.Append(req.State.Get(ctx, &oldState)...)
@@ -481,12 +481,12 @@ func (r *UserResource) Update(ctx context.Context, req tfresource.UpdateRequest,
 	resp.State.Set(ctx, &state)
 }
 
-func (r *UserResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
+func (r *komodoResource) ImportState(ctx context.Context, req tfresource.ImportStateRequest, resp *tfresource.ImportStateResponse) {
 	tfresource.ImportStatePassthroughID(ctx, tfpath.Root("id"), req, resp)
 }
 
 // Add this new method to create GitHub repository
-func (r *UserResource) createGitHubRepository(ctx context.Context, repoName string, fileContents string) error {
+func (r *komodoResource) createGitHubRepository(ctx context.Context, repoName string, fileContents string) error {
 	// Sanitize the repository name and append "_syncresources"
 	sanitizedName := sanitizeRepoName(repoName) + "_syncresources"
 	
@@ -570,7 +570,7 @@ func (r *UserResource) createGitHubRepository(ctx context.Context, repoName stri
 }
 
 // Delete GitHub repository
-func (r *UserResource) deleteGitHubRepository(ctx context.Context, repoName string) error {
+func (r *komodoResource) deleteGitHubRepository(ctx context.Context, repoName string) error {
 	// Sanitize the repository name and append _syncresources
 	sanitizedName := sanitizeRepoName(repoName) + "_syncresources"
 	
@@ -619,7 +619,7 @@ func sanitizeRepoName(name string) string {
 }
 
 // Add this new method to update the file in the repository
-func (r *UserResource) updateFileInRepository(ctx context.Context, repoName, owner, fileContents string) error {
+func (r *komodoResource) updateFileInRepository(ctx context.Context, repoName, owner, fileContents string) error {
 	// Append _syncresources to the repo name
 	repoName = repoName + "_syncresources"
 	
@@ -674,7 +674,7 @@ func (r *UserResource) updateFileInRepository(ctx context.Context, repoName, own
 }
 
 // Helper method to make API calls
-func (r *UserResource) makeAPICall(payload string, url string) error {
+func (r *komodoResource) makeAPICall(payload string, url string) error {
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(payload)))
 	if err != nil {
 		return fmt.Errorf("error creating request: %s", err)
@@ -699,7 +699,7 @@ func (r *UserResource) makeAPICall(payload string, url string) error {
 }
 
 // Add this helper function to check if a server is available
-func (r *UserResource) waitForServerAvailability(serverName string, maxAttempts int, sleepDuration time.Duration) error {
+func (r *komodoResource) waitForServerAvailability(serverName string, maxAttempts int, sleepDuration time.Duration) error {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		// Create the GetServer payload
 		getServerPayload := fmt.Sprintf(`{
@@ -760,7 +760,7 @@ func (r *UserResource) waitForServerAvailability(serverName string, maxAttempts 
 }
 
 // Add this helper function to check if a server is in OK state
-func (r *UserResource) waitForServerStateEnabled(serverName string, maxAttempts int, sleepDuration time.Duration) error {
+func (r *komodoResource) waitForServerStateEnabled(serverName string, maxAttempts int, sleepDuration time.Duration) error {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
 		// Create the GetServerState payload
 		getServerStatePayload := fmt.Sprintf(`{

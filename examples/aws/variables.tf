@@ -78,7 +78,7 @@ variable "allowed_cidr_blocks" {
 }
 
 # Custom Provider Configuration
-variable "myuserprovider_endpoint" {
+variable "komodo_provider_endpoint" {
   description = "Endpoint for custom user provider"
   type        = string
   default     = "http://127.0.0.1:9120"

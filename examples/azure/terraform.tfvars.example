@@ -36,7 +36,7 @@ oauth_client_id     = "your-oauth-client-id"
 oauth_client_secret = "your-oauth-client-secret"
 
 # Custom Provider Configuration
-myuserprovider_endpoint = "http://your-endpoint:9120"
+komodo_provider_endpoint = "http://your-endpoint:9120"
 github_token            = "your-github-token"
 
 # Repository Configuration

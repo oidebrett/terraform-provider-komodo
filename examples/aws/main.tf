@@ -6,8 +6,8 @@ terraform {
       source  = "hashicorp/aws"
       version = "~> 5.0"
     }
-    myuserprovider = {
-      source = "example.com/me/myuserprovider"
+    komodo-provider = {
+      source = "example.com/me/komodo-provider"
       # version = "~> 1.0"
     }
   }
@@ -20,9 +20,9 @@ provider "aws" {
   secret_key = var.aws_secret_key != "" ? var.aws_secret_key : null
 }
 
-# Custom User Provider
-provider "myuserprovider" {
-  endpoint     = var.myuserprovider_endpoint
+# Custom Komodo Provider
+provider "komodo-provider" {
+  endpoint     = var.komodo_provider_endpoint
   github_token = var.github_token
 }
 
@@ -95,10 +95,10 @@ resource "aws_instance" "client_instance" {
 }
 
 # Custom provider resource with templated configuration
-resource "myuserprovider_user" "client_syncresources" {
+resource "komodo-provider_user" "client_syncresources" {
   id                = var.client_id
   name              = var.client_name
-  env_file_contents = templatefile("${path.module}/config-template.toml", {
+  file_contents = templatefile("${path.module}/config-template.toml", {
     client_name_lower        = lower(var.client_name)
     client_name             = var.client_name
     domain                  = var.domain
@@ -110,7 +110,7 @@ resource "myuserprovider_user" "client_syncresources" {
     postgres_user           = var.postgres_user
     postgres_password       = var.postgres_password
     postgres_host           = var.postgres_host
-    static_page_domain      = upper(tostring(var.static_page_domain))
+    static_page_domain      = lower(tostring(var.static_page_domain))
     oauth_client_id         = var.oauth_client_id
     oauth_client_secret     = var.oauth_client_secret
     github_repo             = var.github_repo
