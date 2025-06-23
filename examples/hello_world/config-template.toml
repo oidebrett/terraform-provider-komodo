@@ -1,0 +1,39 @@
+[[stack]]
+name = "${client_name_lower}_stack"
+[stack.config]
+server = "server-${client_name_lower}"
+file_contents = """
+services:
+  python-http:
+    image: python:3.11-slim
+    container_name: python-http
+    working_dir: /app
+    command: python -m http.server 80
+    ports:
+      - "80:80"
+    restart: unless-stopped
+"""
+
+[[procedure]]
+name = "${client_name}_ProcedureApply"
+description = "This procedure runs the stack deployment"
+
+[[procedure.config.stage]]
+name = "${client_name}_Stack"
+enabled = true
+executions = [
+  { execution.type = "DeployStack", execution.params.stack = "${client_name_lower}_stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure]]
+name = "${client_name}_ProcedureDestroy"
+description = "This procedure destroys the stack deployment"
+
+[[procedure.config.stage]]
+name = "${client_name}_Stack"
+enabled = true
+executions = [
+  { execution.type = "DestroyStack", execution.params.stack = "${client_name_lower}_stack", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }
+]
+
+
