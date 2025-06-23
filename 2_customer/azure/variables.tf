@@ -130,10 +130,10 @@ variable "postgres_host" {
 }
 
 # Application Configuration
-variable "static_page" {
-  description = "Enable static page"
-  type        = bool
-  default     = false
+variable "static_page_domain" {
+  description = "Static page domain"
+  type        = string
+  default     = "www"
 }
 
 # OAuth Configuration

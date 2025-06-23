@@ -41,3 +41,6 @@ github_token            = "your-github-token"
 
 # Repository Configuration
 github_repo = "your-username/your-repo"
+
+# Feature Flags
+static_page_domain = "www"

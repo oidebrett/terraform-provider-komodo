@@ -186,8 +186,8 @@ variable "github_repo" {
   default     = "oidebrett/getcontextware"
 }
 
-variable "static_page" {
-  description = "Enable static page"
-  type        = bool
-  default     = true
+variable "static_page_domain" {
+  description = "Static page domain"
+  type        = string
+  default     = "www"
 }

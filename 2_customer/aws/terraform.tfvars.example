@@ -48,4 +48,4 @@ github_token           = "your-github-token"
 github_repo = "your-username/your-repo"
 
 # Feature Flags
-static_page = true
+static_page_domain = "www"

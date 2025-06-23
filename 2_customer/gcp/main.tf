@@ -89,7 +89,7 @@ resource "myuserprovider_user" "client_syncresources" {
     postgres_user           = var.postgres_user
     postgres_password       = var.postgres_password
     postgres_host           = var.postgres_host
-    static_page             = upper(tostring(var.static_page))
+    static_page_domain      = upper(tostring(var.static_page_domain))
     oauth_client_id         = var.oauth_client_id
     oauth_client_secret     = var.oauth_client_secret
     github_repo             = var.github_repo

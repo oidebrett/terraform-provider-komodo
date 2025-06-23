@@ -15,7 +15,7 @@ CROWDSEC_ENROLLMENT_KEY=${crowdsec_enrollment_key}
 POSTGRES_USER=${postgres_user}
 POSTGRES_PASSWORD=${postgres_password}
 POSTGRES_HOST=${postgres_host}
-STATIC_PAGE=${static_page}
+STATIC_PAGE_DOMAIN=${static_page_domain}
 CLIENT_ID=${oauth_client_id}
 CLIENT_SECRET=${oauth_client_secret}
 """
@@ -73,4 +73,12 @@ name = "${client_name}_Setup"
 enabled = true
 executions = [
   { execution.type = "DestroyStack", execution.params.stack = "${client_name_lower}_pangolin-setup", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }
+]
+
+[[user_group]]
+name = "${client_name}_user_group"
+permissions = [
+  { target.type = "Server", target.id = "server-${client_name_lower}", level = "Write", specific = ["Attach", "Inspect", "Logs", "Processes", "Terminal"] },
+  { target.type = "Stack", target.id = "${client_name_lower}_pangolin-setup", level = "Write", specific = ["Inspect", "Logs", "Terminal"] },
+  { target.type = "Stack", target.id = "${client_name_lower}_pangolin-stack", level = "Write", specific = ["Inspect", "Logs", "Terminal"] }
 ]
