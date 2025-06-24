@@ -43,8 +43,11 @@ resource "komodo-provider_user" "example" {
     domain = "example.com"
     # Additional variables as needed
   })
+  server_ip = "127.0.0.1"
 }
 ```
+
+The server_ip is the public IP address of the server that will be managed by Komodo. This is typically the IP address of the VM that is running the periphery agent. The [examples](examples/) show you how you can use terraform modules to provision a Cloud VM and then pass the IP address to the Komodo provider.
 
 The `config-template.toml` file provides the template file for your resources syncs. The resources in here will be provisioned in Komodo. Heres a very simple example from the [Hello World Example](examples/hello_world/)
 
