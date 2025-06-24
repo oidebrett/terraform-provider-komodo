@@ -236,7 +236,7 @@ Defines the variables used in the Terraform configuration, including:
 
 2. **Edit the variables file with your values**
    - GCP project ID and credentials
-   - Komodo provider endpoint
+   - Komodo provider endpoint and API key/secret
    - GitHub token
 
 3. **Initialize Terraform**
