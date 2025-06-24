@@ -188,3 +188,12 @@ docker run -it --volume .:/workspace --name tbox timage
 docker start -ai tbox
 ```
 
+## Using Terraform 
+
+From within the Docker container, you can run Terraform commands. For example, to apply the Hello World example:
+
+```bash
+cd /workspace/examples/hello_world
+terraform plan
+terraform apply
+```
