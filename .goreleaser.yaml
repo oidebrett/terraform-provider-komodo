@@ -10,7 +10,7 @@ builds:
     goos: [linux, darwin, windows]
     goarch: [amd64, arm64]
     ldflags: "-s -w -X main.version={{.Version}}"
-    go_build_flags: ["-mod=vendor"]
+    flags: ["-mod=vendor"]
 
 archives:
   - format: zip
