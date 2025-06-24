@@ -36,7 +36,7 @@ coverage.*
 *.coverprofile
 
 # GitHub workflows if they are generated
-/.github/
+#/.github/
 
 # Local environment config (if any)
 .env
