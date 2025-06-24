@@ -97,39 +97,39 @@ executions = [
                  │   terraform apply  │
                  └────────┬───────────┘
                           │
-          ┌───────────────▼────────────────┐
-          │     GCP VM instance created     │
+          ┌───────────────▼─────────────────┐
+          │     Cloud VM instance created   │
           │ (with Docker + periphery agent) │
-          └───────────────┬────────────────┘
+          └───────────────┬─────────────────┘
                           │
             ┌─────────────▼─────────────┐
             │ Komodo Server resource    │
             │ created with VM's IP      │
             └─────────────┬─────────────┘
                           │
-        ┌─────────────────▼─────────────────┐
+        ┌─────────────────▼──────────────────┐
         │  GitHub repo <client>_syncresources│
-        │ created + resources.toml uploaded │
-        └─────────────────┬─────────────────┘
+        │ created + resources.toml uploaded  │
+        └─────────────────┬──────────────────┘
                           │
              ┌────────────▼────────────┐
              │  ResourceSync created   │
              │ (ContextWare + Setup)   │
              └────────────┬────────────┘
                           │
-              ┌───────────▼────────────┐
-              │   <client>_ProcedureApply │◄──────┐
-              │ (Runs DeployStack step) │        │
-              └─────────────────────────┘        │
+              ┌───────────▼───────────────┐
+              │   <client>_ProcedureApply │◄────┐
+              │ (Runs DeployStack step)   │     │
+              └───────────────────────────┘     │
                                                 │
            ┌────────────────────────────┐       │
            │   terraform destroy        │       │
            └────────────┬───────────────┘       │
                         │                       │
-            ┌───────────▼────────────┐          │
+            ┌───────────▼───────────────┐       │
             │ <client>_ProcedureDestroy │───────┘
-            │ (Runs DestroyStack step) │
-            └──────────────────────────┘
+            │ (Runs DestroyStack step)  │
+            └───────────────────────────┘
 
 
 ## Authentication
