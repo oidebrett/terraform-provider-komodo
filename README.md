@@ -114,7 +114,7 @@ executions = [
                           │
              ┌────────────▼────────────┐
              │  ResourceSync created   │
-             │ (ContextWare + Setup)   │
+             │   (Sync'ed + Setup)     │
              └────────────┬────────────┘
                           │
               ┌───────────▼───────────────┐
