@@ -56,3 +56,6 @@ coverage.*
 
 # .terraform variable values
 **/terraform.tfvars
+
+# Vendor
+/vendor/
