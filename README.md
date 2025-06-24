@@ -91,6 +91,46 @@ executions = [
 ]
 
 ```
+## Example Flow
+
+                 ┌────────────────────┐
+                 │   terraform apply  │
+                 └────────┬───────────┘
+                          │
+          ┌───────────────▼────────────────┐
+          │     GCP VM instance created     │
+          │ (with Docker + periphery agent) │
+          └───────────────┬────────────────┘
+                          │
+            ┌─────────────▼─────────────┐
+            │ Komodo Server resource    │
+            │ created with VM's IP      │
+            └─────────────┬─────────────┘
+                          │
+        ┌─────────────────▼─────────────────┐
+        │  GitHub repo <client>_syncresources│
+        │ created + resources.toml uploaded │
+        └─────────────────┬─────────────────┘
+                          │
+             ┌────────────▼────────────┐
+             │  ResourceSync created   │
+             │ (ContextWare + Setup)   │
+             └────────────┬────────────┘
+                          │
+              ┌───────────▼────────────┐
+              │   <client>_ProcedureApply │◄──────┐
+              │ (Runs DeployStack step) │        │
+              └─────────────────────────┘        │
+                                                │
+           ┌────────────────────────────┐       │
+           │   terraform destroy        │       │
+           └────────────┬───────────────┘       │
+                        │                       │
+            ┌───────────▼────────────┐          │
+            │ <client>_ProcedureDestroy │───────┘
+            │ (Runs DestroyStack step) │
+            └──────────────────────────┘
+
 
 ## Authentication
 
