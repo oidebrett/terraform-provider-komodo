@@ -1,0 +1,26 @@
+project_name: terraform-provider-komodo
+
+release:
+  github:
+    owner: oidebrett
+    name: terraform-provider-komodo
+
+builds:
+  - binary: terraform-provider-komodo
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags: "-s -w -X main.version={{.Version}}"
+    go_build_flags: ["-mod=vendor"]
+
+archives:
+  - format: zip
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+
+checksum:
+  name_template: "{{ .ProjectName }}_{{ .Version }}_SHA256SUMS"
+
+signs:
+  - artifacts: checksum
+    args: ["--armor", "--detach-sign"]
