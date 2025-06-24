@@ -23,4 +23,5 @@ checksum:
 
 signs:
   - artifacts: checksum
-    args: ["--armor", "--detach-sign"]
+    args: ["--batch", "--local-user", "{{ .Env.GPG_FINGERPRINT }}", "--output", "${signature}", "--detach-sign", "--armor", "${artifact}"]
+    cmd: gpg
