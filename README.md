@@ -149,16 +149,7 @@ provider "komodo-provider" {
 
 ### Environment Variables
 
-```bash
-export KOMODO_ENDPOINT="http://your-komodo-api-endpoint:9120"
-export GITHUB_TOKEN="your-github-token"
-```
-
-Then in your configuration:
-
-```hcl
-provider "komodo-provider" {}
-```
+You can provide your own environment variables for the Komodo provider. Have a look at the [GCP Examples](examples/gcp/) where additional variables are defined and set in the main.tf file.
 
 ## Getting Started
 
