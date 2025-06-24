@@ -101,6 +101,3 @@ docker run -it --volume .:/workspace --name tbox timage
 docker start -ai tbox
 ```
 
-
-cp /workspace/.terraformrc /root/
-
