@@ -29,6 +29,8 @@ terraform {
 # Configure the provider
 provider "komodo-provider" {
   endpoint = "http://your-komodo-api-endpoint:9120"
+  api_key = "your-api-key"
+  api_secret = "your-api-secret"
   github_token = "your-github-token"
 }
 
@@ -44,15 +46,60 @@ resource "komodo-provider_user" "example" {
 }
 ```
 
+The `config-template.toml` file provides the template file for your resources syncs. The resources in here will be provisioned in Komodo. Heres a very simple example from the [Hello World Example](examples/hello_world/)
+
+```toml
+[[stack]]
+name = "${client_name_lower}_stack"
+[stack.config]
+server = "server-${client_name_lower}"
+file_contents = """
+services:
+  python-http:
+    image: python:3.11-slim
+    container_name: python-http
+    working_dir: /app
+    command: python -m http.server 80
+    ports:
+      - "80:80"
+    restart: unless-stopped
+"""
+
+[[procedure]]
+name = "${client_name}_ProcedureApply"
+description = "This procedure runs the stack deployment"
+
+[[procedure.config.stage]]
+name = "${client_name}_Stack"
+enabled = true
+executions = [
+  { execution.type = "DeployStack", execution.params.stack = "${client_name_lower}_stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure]]
+name = "${client_name}_ProcedureDestroy"
+description = "This procedure destroys the stack deployment"
+
+[[procedure.config.stage]]
+name = "${client_name}_Stack"
+enabled = true
+executions = [
+  { execution.type = "DestroyStack", execution.params.stack = "${client_name_lower}_stack", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }
+]
+
+```
+
 ## Authentication
 
-The Komodo provider requires an endpoint URL and GitHub token for authentication:
+The Komodo provider requires an endpoint URL, API keys and GitHub token for authentication:
 
 ### Static Credentials
 
 ```hcl
 provider "komodo-provider" {
   endpoint = "http://your-komodo-api-endpoint:9120"
+  api_key = "your-api-key"
+  api_secret = "your-api-secret"
   github_token = "your-github-token"
 }
 ```
@@ -69,6 +116,12 @@ Then in your configuration:
 ```hcl
 provider "komodo-provider" {}
 ```
+
+## Getting Started
+
+A very simple Komodo provider that spins up a Python http server can be found in :
+
+- [Hello World Example](examples/hello_world/)
 
 ## Cloud Provider Integration
 
