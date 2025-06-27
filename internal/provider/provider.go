@@ -15,12 +15,16 @@ import (
 
 type KomodoProviderModel struct {
 	Endpoint     tftypes.String `tfsdk:"endpoint"`
+	ApiKey       tftypes.String `tfsdk:"api_key"`
+	ApiSecret    tftypes.String `tfsdk:"api_secret"`
 	GithubToken  tftypes.String `tfsdk:"github_token"`
 	GithubOrgname tftypes.String `tfsdk:"github_orgname"` // Changed from github_username
 }
 
 type KomodoProvider struct {
 	endpoint      string
+	apiKey        string
+	apiSecret     string
 	githubToken   string
 	githubOrgname string // Changed from githubUsername
 	client        *http.Client
@@ -45,6 +49,16 @@ func (p *KomodoProvider) Schema(ctx context.Context, req tfprovider.SchemaReques
 			"endpoint": tfschema.StringAttribute{
 				Required:    true,
 				Description: "The endpoint URL of the user service",
+			},
+			"api_key": tfschema.StringAttribute{
+				Required:    true,
+				Sensitive:   true, // Mark as sensitive to hide in logs
+				Description: "API key for authentication",
+			},
+			"api_secret": tfschema.StringAttribute{
+				Required:    true,
+				Sensitive:   true, // Mark as sensitive to hide in logs
+				Description: "API secret for authentication",
 			},
 			"github_token": tfschema.StringAttribute{
 				Required:    true,
@@ -73,6 +87,8 @@ func (p *KomodoProvider) Configure(ctx context.Context, req tfprovider.Configure
 	}
 	
 	p.endpoint = endpoint
+	p.apiKey = data.ApiKey.ValueString()
+	p.apiSecret = data.ApiSecret.ValueString()
 	p.githubToken = data.GithubToken.ValueString() // Store the GitHub token
 	p.githubOrgname = data.GithubOrgname.ValueString() // Store the GitHub org name
 	p.client = http.DefaultClient

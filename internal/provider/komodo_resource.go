@@ -26,6 +26,8 @@ var _ tfresource.ResourceWithImportState = &komodoResource{}
 type komodoResource struct {
 	client        *http.Client
 	endpoint      string
+	apiKey        string
+	apiSecret     string
 	githubToken   string
 	githubOrgname string // Changed from githubUsername
 }
@@ -84,6 +86,8 @@ func (r *komodoResource) Configure(ctx context.Context, req tfresource.Configure
 	}
 	r.client = provider.client
 	r.endpoint = provider.endpoint
+	r.apiKey = provider.apiKey
+	r.apiSecret = provider.apiSecret
 	r.githubToken = provider.githubToken
 	r.githubOrgname = provider.githubOrgname // Get the GitHub org name
 }
@@ -192,8 +196,8 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		return
 	}
 	
-	// Wait for the ContextWare sync to complete (up to 5 seconds)
-	time.Sleep(5 * time.Second)
+	// Wait for the ContextWare sync to complete (up to 15 seconds)
+	time.Sleep(15 * time.Second)
 	
 	// 4. Now run the ResourceSetup sync
 	runResourceSetupPayload := fmt.Sprintf(`{
@@ -209,8 +213,8 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		return
 	}
 
-	// Wait for the ResourceSetup sync to complete (up to 5 seconds)
-	time.Sleep(5 * time.Second)
+	// Wait for the ResourceSetup sync to complete (up to 15 seconds)
+	time.Sleep(15 * time.Second)
 
 	// 5. Run Procedure
 	runProcedurePayload := fmt.Sprintf(`{
@@ -681,8 +685,8 @@ func (r *komodoResource) makeAPICall(payload string, url string) error {
 	}
 	
 	req.Header.Set("Content-Type", "application/json")
-	req.Header.Set("X-Api-Key", "REMOVED")
-	req.Header.Set("X-Api-Secret", "REMOVED")
+	req.Header.Set("X-Api-Key", r.apiKey)
+	req.Header.Set("X-Api-Secret", r.apiSecret)
 	
 	resp, err := r.client.Do(req)
 	if err != nil {
@@ -717,8 +721,8 @@ func (r *komodoResource) waitForServerAvailability(serverName string, maxAttempt
 		}
 		
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", "REMOVED")
-		req.Header.Set("X-Api-Secret", "REMOVED")
+		req.Header.Set("X-Api-Key", r.apiKey)
+		req.Header.Set("X-Api-Secret", r.apiSecret)
 		
 		resp, err := client.Do(req)
 		if err != nil {
@@ -778,8 +782,8 @@ func (r *komodoResource) waitForServerStateEnabled(serverName string, maxAttempt
 		}
 		
 		req.Header.Set("Content-Type", "application/json")
-		req.Header.Set("X-Api-Key", "REMOVED")
-		req.Header.Set("X-Api-Secret", "REMOVED")
+		req.Header.Set("X-Api-Key", r.apiKey)
+		req.Header.Set("X-Api-Secret", r.apiSecret)
 		
 		resp, err := client.Do(req)
 		if err != nil {

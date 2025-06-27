@@ -157,6 +157,19 @@ variable "komodo_provider_endpoint" {
   default     = "http://localhost:9120"
 }
 
+variable "komodo_api_key" {
+  description = "API key for komodo provider"
+  type        = string
+  default     = ""
+}
+
+variable "komodo_api_secret" {
+  description = "API secret for komodo provider"
+  type        = string
+  sensitive   = true
+  default     = ""
+}
+
 variable "github_token" {
   description = "GitHub token for repository access"
   type        = string

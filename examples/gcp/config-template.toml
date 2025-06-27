@@ -53,9 +53,9 @@ executions = [
 
 [[procedure.config.stage]]
 name = "${client_name}_Stack"
-enabled = true
+enabled = false
 executions = [
-  { execution.type = "DeployStack", execution.params.stack = "${client_name_lower}_pangolin-stack", execution.params.services = [], enabled = true }
+  { execution.type = "DeployStack", execution.params.stack = "${client_name_lower}_pangolin-stack", execution.params.services = [], enabled = false }
 ]
 
 [[procedure]]

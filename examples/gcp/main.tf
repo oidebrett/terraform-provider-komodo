@@ -24,6 +24,8 @@ provider "google" {
 # Custom User Provider
 provider "komodo-provider" {
   endpoint     = var.komodo_provider_endpoint
+  api_key      = var.komodo_api_key
+  api_secret   = var.komodo_api_secret
   github_token = var.github_token
 }
 
