@@ -18,6 +18,7 @@ POSTGRES_HOST=${postgres_host}
 STATIC_PAGE_DOMAIN=${static_page_domain}
 CLIENT_ID=${oauth_client_id}
 CLIENT_SECRET=${oauth_client_secret}
+KOMODO_HOST_IP=${komodo_host_ip}
 """
 
 [[stack]]

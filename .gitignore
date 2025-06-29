@@ -50,6 +50,7 @@ coverage.*
 **/terraform-provider-contextware*
 
 **/your-service-account-key.json
+**/your-service-account-key.json:Zone.Identifier
 
 **/terraform.tfstate
 **/terraform.tfstate.backup

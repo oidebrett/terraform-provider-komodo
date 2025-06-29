@@ -608,7 +608,7 @@ We inserted the text below:
 ```go
 provider_installation {
     dev_overrides {
-        "example.com/me/komodo-provider" = "/workspace/provider/bin"
+        "example.com/me/komodo-provider" = "/workspace/bin"
     }
     direct {} # For all other providers, install directly from their origin provider.
 }

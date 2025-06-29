@@ -95,6 +95,7 @@ resource "komodo-provider_user" "client_syncresources" {
     oauth_client_id         = var.oauth_client_id
     oauth_client_secret     = var.oauth_client_secret
     github_repo             = var.github_repo
+    komodo_host_ip          = google_compute_instance.gcp_vm.network_interface[0].access_config[0].nat_ip
   })
   server_ip = google_compute_instance.gcp_vm.network_interface[0].access_config[0].nat_ip
 }
