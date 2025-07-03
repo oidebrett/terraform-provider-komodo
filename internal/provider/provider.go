@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
 	tfdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
 	tffunction "github.com/hashicorp/terraform-plugin-framework/function"
@@ -42,6 +43,15 @@ func New() func() tfprovider.Provider {
 func (p *KomodoProvider) Metadata(ctx context.Context, req tfprovider.MetadataRequest, resp *tfprovider.MetadataResponse) {
 	resp.TypeName = "komodo-provider" // matches in your .tf file `resource "komodo-provider_user" "john_doe" {`
 }
+
+
+func Provider() *schema.Provider {
+	return &schema.Provider{
+		// Define your provider schema, resources, etc.
+
+	}
+}
+
 
 func (p *KomodoProvider) Schema(ctx context.Context, req tfprovider.SchemaRequest, resp *tfprovider.SchemaResponse) {
 	resp.Schema = tfschema.Schema{

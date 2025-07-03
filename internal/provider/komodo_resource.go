@@ -98,22 +98,37 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 	if resp.Diagnostics.HasError() {
 		return
 	}
-	
+
+	// A slice of functions to execute for cleanup if something goes wrong.
+	var cleanupTasks []func()
+
+	// Defer the execution of cleanup tasks in case of an error.
+	defer func() {
+		if resp.Diagnostics.HasError() {
+			// Run cleanup tasks in reverse order.
+			for i := len(cleanupTasks) - 1; i >= 0; i-- {
+				cleanupTasks[i]()
+			}
+		}
+	}()
+
 	// First, create GitHub repository with file if contents provided
 	fileContents := ""
 	if !state.FileContents.IsNull() {
 		fileContents = state.FileContents.ValueString()
 	}
-	
+
 	err := r.createGitHubRepository(ctx, state.Name.ValueString(), fileContents)
 	if err != nil {
 		resp.Diagnostics.AddError("GitHub Error", fmt.Sprintf("Error creating GitHub repository: %s", err))
 		return
 	}
-	
-	// Skip the user creation API call that was here before
-	// We're keeping the endpoint for other API calls
-	
+	cleanupTasks = append(cleanupTasks, func() {
+		if err := r.deleteGitHubRepository(ctx, state.Name.ValueString()); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete GitHub repository during cleanup: %s", err))
+		}
+	})
+
 	// 1. Create a server using the server_ip
 	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
 	createServerPayload := fmt.Sprintf(`{
@@ -132,14 +147,25 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating server: %s", err))
 		return
 	}
-	
+	cleanupTasks = append(cleanupTasks, func() {
+		deleteServerPayload := fmt.Sprintf(`{
+			"type": "DeleteServer",
+			"params": {
+				"id": "%s"
+			}
+		}`, serverName)
+		if err := r.makeAPICall(deleteServerPayload, r.endpoint+"write"); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete server during cleanup: %s", err))
+		}
+	})
+
 	// Wait for the server to become available, checking every 10 seconds for up to 3 minutes
 	err = r.waitForServerAvailability(serverName, 18, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to become available: %s", err))
 		return
 	}
-	
+
 	// Enable the server
 	updateServerPayload := fmt.Sprintf(`{
 		"type": "UpdateServer",
@@ -150,13 +176,13 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 			}
 		}
 	}`, serverName)
-	
+
 	err = r.makeAPICall(updateServerPayload, r.endpoint+"write")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error enabling server: %s", err))
 		return
 	}
-	
+
 	// Wait for the server to reach OK state, checking every 10 seconds for up to 3 minutes
 	err = r.waitForServerStateEnabled(serverName, 18, 10*time.Second)
 	if err != nil {
@@ -175,13 +201,24 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 			}
 		}
 	}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
-	
+
 	err = r.makeAPICall(createContextWarePayload, r.endpoint+"write")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating ContextWare resource sync: %s", err))
 		return
 	}
-	
+	cleanupTasks = append(cleanupTasks, func() {
+		deleteContextWareSyncPayload := fmt.Sprintf(`{
+			"type": "DeleteResourceSync",
+			"params": {
+				"id": "%s_ContextWare"
+			}
+		}`, state.Name.ValueString())
+		if err := r.makeAPICall(deleteContextWareSyncPayload, r.endpoint+"write"); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete ContextWare sync during cleanup: %s", err))
+		}
+	})
+
 	// 3. Run the ContextWare sync first
 	runContextWarePayload := fmt.Sprintf(`{
 		"type": "RunSync",
@@ -189,16 +226,27 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 			"sync": "%s_ContextWare"
 		}
 	}`, state.Name.ValueString())
-	
+
 	err = r.makeAPICall(runContextWarePayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running ContextWare sync: %s", err))
 		return
 	}
-	
+	cleanupTasks = append(cleanupTasks, func() {
+		deleteResourceSetupSyncPayload := fmt.Sprintf(`{
+			"type": "DeleteResourceSync",
+			"params": {
+				"id": "%s_ResourceSetup"
+			}
+		}`, state.Name.ValueString())
+		if err := r.makeAPICall(deleteResourceSetupSyncPayload, r.endpoint+"write"); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete ResourceSetup sync during cleanup: %s", err))
+		}
+	})
+
 	// Wait for the ContextWare sync to complete (up to 15 seconds)
 	time.Sleep(15 * time.Second)
-	
+
 	// 4. Now run the ResourceSetup sync
 	runResourceSetupPayload := fmt.Sprintf(`{
 		"type": "RunSync",
@@ -206,12 +254,33 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 			"sync": "%s_ResourceSetup"
 		}
 	}`, state.Name.ValueString())
-	
+
 	err = r.makeAPICall(runResourceSetupPayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running ResourceSetup sync: %s", err))
 		return
 	}
+	cleanupTasks = append(cleanupTasks, func() {
+		deleteProcedureApplyPayload := fmt.Sprintf(`{
+			"type": "DeleteProcedure",
+			"params": {
+				"id": "%s_ProcedureApply"
+			}
+		}`, state.Name.ValueString())
+		if err := r.makeAPICall(deleteProcedureApplyPayload, r.endpoint+"write"); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete apply procedure during cleanup: %s", err))
+		}
+
+		deleteProcedureDestroyPayload := fmt.Sprintf(`{
+			"type": "DeleteProcedure",
+			"params": {
+				"id": "%s_ProcedureDestroy"
+			}
+		}`, state.Name.ValueString())
+		if err := r.makeAPICall(deleteProcedureDestroyPayload, r.endpoint+"write"); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete destroy procedure during cleanup: %s", err))
+		}
+	})
 
 	// Wait for the ResourceSetup sync to complete (up to 15 seconds)
 	time.Sleep(15 * time.Second)
@@ -223,13 +292,13 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 			"procedure": "%s_ProcedureApply"
 		}
 	}`, state.Name.ValueString())
-	
+
 	err = r.makeAPICall(runProcedurePayload, r.endpoint+"execute")
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running procedure: %s", err))
 		return
 	}
-	
+
 	resp.State.Set(ctx, &state)
 }
 

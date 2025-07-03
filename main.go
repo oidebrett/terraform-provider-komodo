@@ -6,6 +6,7 @@ import (
 
 	"example.com/me/komodo-provider/internal/provider"
 	"github.com/hashicorp/terraform-plugin-framework/providerserver"
+	"github.com/hashicorp/terraform-plugin-sdk/v2/plugin"
 )
 
 func main() {
@@ -16,5 +17,9 @@ func main() {
 	if err != nil {
 		log.Fatal(err.Error())
 	}
+	plugin.Serve(&plugin.ServeOpts{
+    	ProviderFunc: provider.Provider,
+    	ProviderAddr: "example.com/me/komodo-provider", // 👈 this must match your .tf and .terraformrc
+	})
 }
 
