@@ -173,8 +173,6 @@ ssh_username   = "adminuser"
 # Application Configuration
 domain                  = "myapp.example.com"
 admin_email             = "admin@example.com"
-admin_username          = "admin@example.com"
-admin_password          = "secure-password-123"
 admin_subdomain         = "admin"
 crowdsec_enrollment_key = "your-crowdsec-key"
 

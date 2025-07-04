@@ -105,8 +105,6 @@ resource "komodo-provider_user" "client_syncresources" {
     client_name             = var.client_name
     domain                  = var.domain
     admin_email             = var.admin_email
-    admin_username          = var.admin_username
-    admin_password          = var.admin_password
     admin_subdomain         = var.admin_subdomain
     crowdsec_enrollment_key = var.crowdsec_enrollment_key
     postgres_user           = var.postgres_user

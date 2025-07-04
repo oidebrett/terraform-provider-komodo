@@ -221,8 +221,6 @@ resource "azurerm_linux_virtual_machine" "client_vm" {
 #    client_name_lower  = lower(var.client_name)
 #    domain             = var.domain
 #    admin_email        = var.admin_email
-#    admin_username     = var.admin_username
-#    admin_password     = var.admin_password
 #    admin_subdomain    = var.admin_subdomain
 #    crowdsec_enrollment_key = var.crowdsec_enrollment_key
 #    postgres_user      = var.postgres_user
