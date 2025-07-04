@@ -129,6 +129,19 @@ variable "admin_email" {
   default     = "admin@example.com"
 }
 
+variable "admin_username" {
+  description = "Admin username"
+  type        = string
+  default     = "admin@example.com"
+}
+
+variable "admin_password" {
+  description = "Admin password"
+  type        = string
+  default     = ""
+  sensitive   = true
+}
+
 variable "admin_subdomain" {
   description = "Admin subdomain"
   type        = string

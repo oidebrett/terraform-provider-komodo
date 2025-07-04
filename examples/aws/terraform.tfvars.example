@@ -26,6 +26,8 @@ allowed_cidr_blocks   = ["0.0.0.0/0"]  # Consider restricting this for better se
 # Application Configuration
 domain                  = "yourdomain.com"
 admin_email            = "admin@yourdomain.com"
+admin_username         = "admin@yourdomain.com"
+admin_password         = "your-secure-password"
 admin_subdomain        = "admin"
 crowdsec_enrollment_key = "your-crowdsec-key"
 
