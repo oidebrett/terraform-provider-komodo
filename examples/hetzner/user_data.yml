@@ -30,8 +30,8 @@ runcmd:
   - systemctl enable docker
   - usermod -aG docker admin
   
-  # Install periphery and wait before enabling
-  - bash -c 'curl -sSL https://raw.githubusercontent.com/moghtech/komodo/main/scripts/setup-periphery.py | python3 && sleep 5 && systemctl enable periphery && systemctl start periphery'
+  # Install periphery using sudo, then enable and start
+  - bash -c 'curl -sSL https://raw.githubusercontent.com/moghtech/komodo/main/scripts/setup-periphery.py | sudo python3 && sudo systemctl enable periphery && sudo systemctl start periphery'
 
   # Log completion
   - echo "Setup completed at $(date)" > /var/log/user-data.log
