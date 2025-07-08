@@ -1,0 +1,16 @@
+# Copy this file to terraform.tfvars and fill in your actual values
+# Do not commit terraform.tfvars to version control!
+
+# Hetzner Cloud Configuration
+hcloud_token = "your-hetzner-cloud-api-token"
+
+# Server Configuration
+location    = "nbg1"  # Nuremberg, Germany
+server_type = "cx11"  # 1 vCPU, 2GB RAM
+os_type     = "ubuntu-22.04"
+
+# SSH Configuration
+ssh_public_key = "ssh-rsa AAAAB3NzaC1yc2EAAAADAQAB... your-ssh-key-here"
+
+# Firewall Configuration
+allowed_source_ips = ["0.0.0.0/0"]  # Consider restricting this for better security
