@@ -71,7 +71,7 @@ resource "hcloud_server" "web" {
   server_type = var.server_type
   location    = var.location
   ssh_keys    = [hcloud_ssh_key.default.id]
-  user_data   = file("${path.module}/user_data.yml")
+  user_data   = file("${path.module}/startup-script.sh")
   
   # Apply the firewall to this server
   firewall_ids = [hcloud_firewall.web_firewall.id]
