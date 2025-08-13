@@ -20,8 +20,8 @@ The Komodo Terraform Provider allows you to manage your Komodo resources through
 terraform {
   required_providers {
     komodo-provider = {
-      source = "example.com/me/komodo-provider"
-      # version = "~> 1.0"
+      source = "registry.example.com/mattercoder/komodo-provider"
+      version = ">= 1.0.0"
     }
   }
 }
@@ -168,7 +168,11 @@ The Komodo provider can be used alongside major cloud providers to create comple
 ## Building The Provider
 
 1. Clone the repository
-2. Build the provider using Go:
+2. Install the necessary dependencies:
+   ```bash
+   go mod tidy
+   ```
+3. Build the provider using Go:
    ```bash
    go build -o bin/terraform-provider-komodo-provider
    ```

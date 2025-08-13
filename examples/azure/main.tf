@@ -7,7 +7,8 @@ terraform {
       version = "=3.0.0"
     }
 #    komodo-provider = {
-#      source = "example.com/me/komodo-provider"
+#      source = "registry.example.com/mattercoder/komodo-provider"
+#      version = ">= 1.0.0"
 #    }
   }
 }

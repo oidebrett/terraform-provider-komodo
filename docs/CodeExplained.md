@@ -186,8 +186,8 @@ To get started we paste the code below into `main.tf`:
 terraform {
   required_providers {
     komodo-provider = {
-      source  = "example.com/me/komodo-provider"
-      # version = "~> 1.0"
+      source = "registry.example.com/mattercoder/komodo-provider"
+      version = ">= 1.0.0"
     }
   }
 }
