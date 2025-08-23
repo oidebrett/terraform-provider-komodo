@@ -159,8 +159,8 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// Wait for the server to become available, checking every 10 seconds for up to 3 minutes
-	err = r.waitForServerAvailability(serverName, 18, 10*time.Second)
+	// Wait for the server to become available, checking every 10 seconds for up to 5 minutes
+	err = r.waitForServerAvailability(serverName, 30, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to become available: %s", err))
 		return
