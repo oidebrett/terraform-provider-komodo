@@ -183,8 +183,8 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		return
 	}
 
-	// Wait for the server to reach OK state, checking every 10 seconds for up to 3 minutes
-	err = r.waitForServerStateEnabled(serverName, 18, 10*time.Second)
+	// Wait for the server to reach OK state, checking every 10 seconds for up to 5 minutes
+	err = r.waitForServerStateEnabled(serverName, 30, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to reach OK state: %s", err))
 		return
