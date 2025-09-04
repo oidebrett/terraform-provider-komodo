@@ -280,6 +280,16 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		if err := r.makeAPICall(deleteProcedureDestroyPayload, r.endpoint+"write"); err != nil {
 			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete destroy procedure during cleanup: %s", err))
 		}
+
+		deleteProcedureRestartPayload := fmt.Sprintf(`{
+			"type": "DeleteProcedure",
+			"params": {
+				"id": "%s_ProcedureRestart"
+			}
+		}`, state.Name.ValueString())
+		if err := r.makeAPICall(deleteProcedureRestartPayload, r.endpoint+"write"); err != nil {
+			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete restart procedure during cleanup: %s", err))
+		}
 	})
 
 	// Wait for the ResourceSetup sync to complete (up to 15 seconds)
@@ -388,13 +398,29 @@ func (r *komodoResource) Delete(ctx context.Context, req tfresource.DeleteReques
 			"id": "%s_ProcedureDestroy"
 		}
 	}`, data.Name.ValueString())
-	
+
 	err = retryAPICall(deleteProcedureDestroyPayload, r.endpoint+"write", 5)
 	if err != nil {
 		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting destroy procedure after retries: %s", err))
 		// Continue with deletion even if API call fails
 	}
-	
+
+	// Wait a bit between procedure deletions
+	time.Sleep(2 * time.Second)
+
+	deleteProcedureRestartPayload := fmt.Sprintf(`{
+		"type": "DeleteProcedure",
+		"params": {
+			"id": "%s_ProcedureRestart"
+		}
+	}`, data.Name.ValueString())
+
+	err = retryAPICall(deleteProcedureRestartPayload, r.endpoint+"write", 5)
+	if err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error deleting restart procedure after retries: %s", err))
+		// Continue with deletion even if API call fails
+	}
+
 	// Wait a bit before deleting resource syncs
 	time.Sleep(2 * time.Second)
 	
