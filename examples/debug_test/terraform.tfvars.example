@@ -1,0 +1,23 @@
+# Copy this file to terraform.tfvars and fill in your actual values
+
+# Komodo Configuration
+komodo_provider_endpoint = "http://your-komodo-api:9120"
+komodo_api_key          = "your-api-key"
+komodo_api_secret       = "your-api-secret"
+
+# GitHub Configuration
+github_token = "ghp_your-github-token"
+
+# Test Configuration
+client_name       = "DebugTest"
+client_id         = "debug-test-001"
+server_ip         = "1.2.3.4"
+generate_ssh_keys = true
+
+# Application Configuration
+domain           = "debug.example.com"
+admin_email      = "admin@debug.example.com"
+admin_username   = "admin@debug.example.com"
+admin_password   = "DebugPassword123!"
+admin_subdomain  = "admin"
+github_repo      = "debug/test-repo"

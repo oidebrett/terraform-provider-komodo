@@ -1,0 +1,41 @@
+# Copy this file to terraform.tfvars and fill in your actual values
+# Do not commit terraform.tfvars to version control!
+
+# Komodo Configuration
+komodo_endpoint   = "http://your-komodo-api:9120"
+komodo_api_key    = "your-api-key"
+komodo_api_secret = "your-api-secret"
+
+# GitHub Configuration
+github_token   = "ghp_your-github-personal-access-token"
+github_orgname = "your-github-org"  # Optional - leave empty to use personal account
+
+# Client Configuration
+client_name = "MySSHClient"
+client_id   = "1"
+server_ip   = "1.2.3.4"  # Your server's public IP
+
+# SSH Key Configuration
+generate_ssh_keys = true  # Set to false to disable SSH key generation
+
+# Application Configuration
+domain           = "myapp.example.com"
+email            = "admin@example.com"
+admin_username   = "admin@example.com"
+admin_password   = "SecurePassword123!"
+admin_subdomain  = "admin"
+
+# Optional: CrowdSec Configuration
+crowdsec_enrollment_key = "your-crowdsec-enrollment-key"
+
+# Database Configuration
+postgres_user     = "admin"
+postgres_password = "SecureDBPassword123!"
+postgres_host     = "komodo-postgres-1"
+
+# Feature Flags
+static_page = true
+
+# OAuth Configuration (optional)
+oauth_client_id     = "your-oauth-client-id"
+oauth_client_secret = "your-oauth-client-secret"
