@@ -2,7 +2,7 @@
 name = "${client_name_lower}-setup"
 [stack.config]
 server = "server-${client_name_lower}"
-repo = "oidebrett/getcontextware"
+repo = "manidaecloud/getcontextware"
 file_paths = ["docker-compose-setup.yml"]
 environment = """
 DOMAIN=${domain}

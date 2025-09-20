@@ -196,7 +196,7 @@ variable "oauth_client_secret" {
 variable "github_repo" {
   description = "GitHub repository for deployment"
   type        = string
-  default     = "oidebrett/getcontextware"
+  default     = "manidaecloud/getcontextware"
 }
 
 variable "static_page_domain" {
