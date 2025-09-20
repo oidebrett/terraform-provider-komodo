@@ -52,3 +52,15 @@ output "ssh_key_id" {
   description = "ID of the SSH key"
   value       = digitalocean_ssh_key.default.id
 }
+
+# SSH Key Outputs (only available when generate_ssh_keys = true)
+output "ssh_private_key" {
+  description = "Generated SSH private key for repository access"
+  value       = komodo-provider_user.client_syncresources.ssh_private_key
+  sensitive   = true
+}
+
+output "ssh_public_key" {
+  description = "Generated SSH public key (also uploaded as deploy key)"
+  value       = komodo-provider_user.client_syncresources.ssh_public_key
+}

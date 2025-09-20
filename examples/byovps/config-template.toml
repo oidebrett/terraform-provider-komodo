@@ -1,0 +1,119 @@
+[[stack]]
+name = "test-807749_setup-stack"
+[stack.config]
+server = "server-test-807749"
+repo = "oidebrett/manidae"
+reclone = true
+file_paths = ["docker-compose-setup.yml"]
+environment = """
+DOMAIN=example.com
+
+EMAIL=admin@example.com
+ADMIN_USERNAME=None
+ADMIN_PASSWORD=None
+ADMIN_SUBDOMAIN=pangolin
+
+
+
+
+
+
+
+
+COMPONENTS="pangolin"
+
+
+
+"""
+
+
+[[stack]]
+name = "test-807749_main-stack"
+[stack.config]
+server = "server-test-807749"
+files_on_host = true
+reclone = true
+run_directory = "/etc/komodo/stacks/test-807749_setup-stack"
+
+
+
+[[procedure]]
+name = "test-807749_ProcedureApply"
+description = "This procedure runs the initial setup that write out a compose file for the main stack deployment"
+
+[[procedure.config.stage]]
+name = "test-807749_Setup"
+enabled = true
+executions = [
+  { execution.type = "DeployStack", execution.params.stack = "test-807749_setup-stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure.config.stage]]
+name = "Wait For Compose Write"
+enabled = true
+executions = [
+  { execution.type = "Sleep", execution.params.duration_ms = 10000, enabled = true }
+]
+
+[[procedure.config.stage]]
+name = "Destroy test-807749_Setup"
+enabled = true
+executions = [
+  { execution.type = "DestroyStack", execution.params.stack = "test-807749_setup-stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure.config.stage]]
+name = "test-807749_Stack"
+enabled = true
+executions = [
+  { execution.type = "DeployStack", execution.params.stack = "test-807749_main-stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure]]
+name = "test-807749_ProcedureRestart"
+
+[[procedure.config.stage]]
+name = "Stop test-807749_Stack"
+enabled = true
+executions = [
+  { execution.type = "StopStack", execution.params.stack = "test-807749_main-stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure.config.stage]]
+name = "Wait For Stack Stop"
+enabled = true
+executions = [
+  { execution.type = "Sleep", execution.params.duration_ms = 10000, enabled = true }
+]
+
+[[procedure.config.stage]]
+name = "Start test-807749_Stack"
+enabled = true
+executions = [
+  { execution.type = "StartStack", execution.params.stack = "test-807749_main-stack", execution.params.services = [], enabled = true }
+]
+
+[[procedure]]
+name = "test-807749_ProcedureDestroy"
+
+[[procedure.config.stage]]
+name = "test-807749_Stack"
+enabled = true
+executions = [
+  { execution.type = "DestroyStack", execution.params.stack = "test-807749_main-stack", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }
+]
+
+[[procedure.config.stage]]
+name = "test-807749_Setup"
+enabled = true
+executions = [
+  { execution.type = "DestroyStack", execution.params.stack = "test-807749_setup-stack", execution.params.services = [], execution.params.remove_orphans = false, enabled = true }
+]
+
+[[user_group]]
+name = "test-807749_user_group"
+permissions = [
+  { target.type = "Server", target.id = "server-test-807749", level = "Write", specific = ["Attach", "Inspect", "Logs", "Processes", "Terminal"] },
+  { target.type = "Stack", target.id = "test-807749_setup-stack", level = "Write", specific = ["Inspect", "Logs", "Terminal"] },
+  { target.type = "Stack", target.id = "test-807749_main-stack", level = "Write", specific = ["Inspect", "Logs", "Terminal"] }
+]

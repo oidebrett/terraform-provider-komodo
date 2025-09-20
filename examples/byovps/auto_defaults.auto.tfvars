@@ -1,0 +1,6 @@
+crowdsec_enrollment_key = ""
+static_page_domain = ""
+oauth_client_id = ""
+oauth_client_secret = ""
+komodo_host_ip = ""
+openai_api_key = ""
