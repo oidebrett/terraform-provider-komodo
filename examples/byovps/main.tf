@@ -13,7 +13,7 @@ provider "komodo-provider" {
   api_key        = var.komodo_api_key
   api_secret     = var.komodo_api_secret
   github_token   = var.github_token
-  github_orgname = "manidaecloud"
+  github_orgname = "ManidaeCloud"
 }
 
 resource "komodo-provider_user" "client_syncresources" {

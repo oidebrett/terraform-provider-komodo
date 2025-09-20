@@ -127,7 +127,7 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		if resp.Diagnostics.HasError() {
 			// Run cleanup tasks in reverse order.
 			for i := len(cleanupTasks) - 1; i >= 0; i-- {
-				cleanupTasks[i]()
+			// uncomment this to clean up tasks	- cleanupTasks[i]()
 			}
 		}
 	}()
@@ -228,7 +228,7 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		"params": {
 			"name": "%s_ContextWare",
 			"config": {
-				"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"manidaecloud/%s_syncresources\"\ngit_account = \"manidaecloud\"\nresource_path = [\"resources.toml\"]"
+				"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"ManidaeCloud/%s_syncresources\"\ngit_account = \"ManidaeCloud\"\nresource_path = [\"resources.toml\"]"
 			}
 		}
 	}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
