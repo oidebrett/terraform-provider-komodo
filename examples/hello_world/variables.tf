@@ -125,6 +125,6 @@ variable "client_name" {
 variable "github_repo" {
   description = "GitHub repository for deployment"
   type        = string
-  default     = "manidaecloud/getcontextware"
+  default     = "oidebrett/getcontextware"
 }
 
