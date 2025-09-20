@@ -3,10 +3,13 @@ package provider
 import (
 	"bytes"
 	"context"
+	"crypto/ed25519"
+	"crypto/rand"
 	"encoding/json"
+	"encoding/pem"
 	"fmt"
 	"io"
-	"math/rand"
+	mathrand "math/rand"
 	"net/http"
 	"regexp"
 	"strings"
@@ -17,6 +20,7 @@ import (
 	tfresource "github.com/hashicorp/terraform-plugin-framework/resource"
 	tfpath "github.com/hashicorp/terraform-plugin-framework/path"
 	tftypes "github.com/hashicorp/terraform-plugin-framework/types"
+	"golang.org/x/crypto/ssh"
 	"golang.org/x/oauth2"
 )
 
@@ -33,10 +37,11 @@ type komodoResource struct {
 }
 
 type KomodoModel struct {
-	Id           tftypes.String `tfsdk:"id"`
-	Name         tftypes.String `tfsdk:"name"`
-	FileContents tftypes.String `tfsdk:"file_contents"`
-	ServerIP     tftypes.String `tfsdk:"server_ip"`
+	Id               tftypes.String `tfsdk:"id"`
+	Name             tftypes.String `tfsdk:"name"`
+	FileContents     tftypes.String `tfsdk:"file_contents"`
+	ServerIP         tftypes.String `tfsdk:"server_ip"`
+	GenerateSSHKeys  tftypes.Bool   `tfsdk:"generate_ssh_keys"`
 }
 
 func NewKomodoResource() tfresource.Resource {
@@ -66,6 +71,10 @@ func (r *komodoResource) Schema(ctx context.Context, req tfresource.SchemaReques
 			},
 			"server_ip": tfschema.StringAttribute{
 				MarkdownDescription: "The public IP address of the EC2 instance",
+				Optional:            true,
+			},
+			"generate_ssh_keys": tfschema.BoolAttribute{
+				MarkdownDescription: "Whether to generate SSH keys and upload them as deploy keys to the GitHub repository",
 				Optional:            true,
 			},
 		},
@@ -118,7 +127,12 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		fileContents = state.FileContents.ValueString()
 	}
 
-	err := r.createGitHubRepository(ctx, state.Name.ValueString(), fileContents)
+	generateSSHKeys := false
+	if !state.GenerateSSHKeys.IsNull() {
+		generateSSHKeys = state.GenerateSSHKeys.ValueBool()
+	}
+
+	err := r.createGitHubRepository(ctx, state.Name.ValueString(), fileContents, generateSSHKeys)
 	if err != nil {
 		resp.Diagnostics.AddError("GitHub Error", fmt.Sprintf("Error creating GitHub repository: %s", err))
 		return
@@ -332,7 +346,7 @@ func (r *komodoResource) Delete(ctx context.Context, req tfresource.DeleteReques
 	}
 	
 	// Initialize random number generator
-	rand.Seed(time.Now().UnixNano())
+	mathrand.Seed(time.Now().UnixNano())
 	
 	// First, run the destroy procedure
 	runDestroyPayload := fmt.Sprintf(`{
@@ -364,7 +378,7 @@ func (r *komodoResource) Delete(ctx context.Context, req tfresource.DeleteReques
 			// If we get a "Procedure busy" error, wait and retry
 			if strings.Contains(err.Error(), "Procedure busy") {
 				// Longer exponential backoff with more randomness
-				sleepTime := time.Duration(3*(i+1)+rand.Intn(3)) * time.Second
+				sleepTime := time.Duration(3*(i+1)+mathrand.Intn(3)) * time.Second
 				time.Sleep(sleepTime)
 				continue
 			}
@@ -524,7 +538,13 @@ func (r *komodoResource) Update(ctx context.Context, req tfresource.UpdateReques
 			owner = *user.Login
 		}
 		
-		err := r.updateFileInRepository(ctx, sanitizeRepoName(state.Name.ValueString()), owner, state.FileContents.ValueString())
+		generateSSHKeys := false
+		if !state.GenerateSSHKeys.IsNull() {
+			generateSSHKeys = state.GenerateSSHKeys.ValueBool()
+		}
+		fmt.Sprintf("GenerateSSHKeys is: ",generateSSHKeys)
+
+		err := r.updateFileInRepository(ctx, sanitizeRepoName(state.Name.ValueString()), owner, state.FileContents.ValueString(), generateSSHKeys)
 		if err != nil {
 			resp.Diagnostics.AddError("GitHub Error", fmt.Sprintf("Error updating file in repository: %s", err))
 			return
@@ -585,22 +605,22 @@ func (r *komodoResource) ImportState(ctx context.Context, req tfresource.ImportS
 }
 
 // Add this new method to create GitHub repository
-func (r *komodoResource) createGitHubRepository(ctx context.Context, repoName string, fileContents string) error {
+func (r *komodoResource) createGitHubRepository(ctx context.Context, repoName string, fileContents string, generateSSHKeys bool) error {
 	// Sanitize the repository name and append "_syncresources"
 	sanitizedName := sanitizeRepoName(repoName) + "_syncresources"
-	
+
 	// Check if token is available
 	if r.githubToken == "" {
 		return fmt.Errorf("GitHub token is not set. Please provide it via configuration or GITHUB_TOKEN environment variable")
 	}
-	
+
 	// Use the token from the provider configuration
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: r.githubToken},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
-	
+
 	// Create repository - set Private to true
 	repo := &github.Repository{
 		Name:        github.String(sanitizedName),
@@ -608,49 +628,78 @@ func (r *komodoResource) createGitHubRepository(ctx context.Context, repoName st
 		Private:     github.Bool(true), // Changed to true to make the repository private
 		AutoInit:    github.Bool(true), // Initialize with README so we have a main branch
 	}
-	
+
 	// If org name is provided, create in that organization
 	// Otherwise, create in the authenticated user's account
 	owner := ""
 	if r.githubOrgname != "" {
 		owner = r.githubOrgname
 	}
-	
+
 	_, _, err := client.Repositories.Create(ctx, owner, repo)
 	if err != nil {
 		return fmt.Errorf("failed to create GitHub repository: %v", err)
 	}
-	
+
+	// Wait a moment for the repository to be fully initialized
+	time.Sleep(2 * time.Second)
+
+	// Get the default branch name
+	repoOwner := owner
+	if repoOwner == "" {
+		user, _, err := client.Users.Get(ctx, "")
+		if err != nil {
+			return fmt.Errorf("failed to get authenticated user: %v", err)
+		}
+		repoOwner = *user.Login
+	}
+
+	var privateKey, publicKey string
+
+	// Generate SSH key pair if requested
+	if generateSSHKeys {
+		privateKey, publicKey, err = r.generateSSHKeyPair()
+		if err != nil {
+			return fmt.Errorf("failed to generate SSH key pair: %v", err)
+		}
+
+		// Upload the public key as a deploy key
+		deployKeyTitle := fmt.Sprintf("terraform-deploy-key-%d", time.Now().Unix())
+		err = r.uploadDeployKey(ctx, repoOwner, sanitizedName, publicKey, deployKeyTitle, false)
+		if err != nil {
+			return fmt.Errorf("failed to upload deploy key: %v", err)
+		}
+	}
+
 	// If file contents are provided, create the file
 	if fileContents != "" {
-		// Wait a moment for the repository to be fully initialized
-		time.Sleep(2 * time.Second)
-		
-		// Get the default branch name
-		repoOwner := owner
-		if repoOwner == "" {
-			user, _, err := client.Users.Get(ctx, "")
-			if err != nil {
-				return fmt.Errorf("failed to get authenticated user: %v", err)
-			}
-			repoOwner = *user.Login
+		updatedFileContents := fileContents
+
+		// Add SSH keys to the file contents if they were generated
+		if generateSSHKeys && privateKey != "" && publicKey != "" {
+			updatedFileContents = r.addSSHKeysToFileContents(fileContents, privateKey, publicKey)
 		}
-		
+
 		// Get the repository to determine the default branch
 		repoInfo, _, err := client.Repositories.Get(ctx, repoOwner, sanitizedName)
 		if err != nil {
 			return fmt.Errorf("failed to get repository info: %v", err)
 		}
-		
+
 		defaultBranch := "main"
 		if repoInfo.DefaultBranch != nil {
 			defaultBranch = *repoInfo.DefaultBranch
 		}
-		
+
 		// Create the file - changed from contents.txt to resources.toml
-		fileContent := []byte(fileContents)
+		fileContent := []byte(updatedFileContents)
+		commitMessage := "Add resources.toml via Terraform"
+		if generateSSHKeys && privateKey != "" && publicKey != "" {
+			commitMessage = "Add resources.toml with SSH keys via Terraform"
+		}
+
 		opts := &github.RepositoryContentFileOptions{
-			Message:   github.String("Add resources.toml via Terraform"),
+			Message:   github.String(commitMessage),
 			Content:   fileContent,
 			Branch:    github.String(defaultBranch),
 			Committer: &github.CommitAuthor{
@@ -658,7 +707,7 @@ func (r *komodoResource) createGitHubRepository(ctx context.Context, repoName st
 				Email: github.String("terraform@example.com"),
 			},
 		}
-		
+
 		_, _, err = client.Repositories.CreateFile(ctx, repoOwner, sanitizedName, "resources.toml", opts)
 		if err != nil {
 			return fmt.Errorf("failed to create file in repository: %v", err)
@@ -718,28 +767,28 @@ func sanitizeRepoName(name string) string {
 }
 
 // Add this new method to update the file in the repository
-func (r *komodoResource) updateFileInRepository(ctx context.Context, repoName, owner, fileContents string) error {
+func (r *komodoResource) updateFileInRepository(ctx context.Context, repoName, owner, fileContents string, generateSSHKeys bool) error {
 	// Append _syncresources to the repo name
 	repoName = repoName + "_syncresources"
-	
+
 	ts := oauth2.StaticTokenSource(
 		&oauth2.Token{AccessToken: r.githubToken},
 	)
 	tc := oauth2.NewClient(ctx, ts)
 	client := github.NewClient(tc)
-	
+
 	// Get the repository to determine the default branch
 	repoInfo, _, err := client.Repositories.Get(ctx, owner, repoName)
 	if err != nil {
 		return fmt.Errorf("failed to get repository info: %v", err)
 	}
-	
+
 	defaultBranch := "main"
 	if repoInfo.DefaultBranch != nil {
 		defaultBranch = *repoInfo.DefaultBranch
 	}
-	
-	// Get the current file to get its SHA
+
+	// Get the current file to get its SHA and extract existing SSH keys
 	fileContent, _, _, err := client.Repositories.GetContents(
 		ctx,
 		owner,
@@ -747,28 +796,86 @@ func (r *komodoResource) updateFileInRepository(ctx context.Context, repoName, o
 		"resources.toml", // Changed from contents.txt to resources.toml
 		&github.RepositoryContentGetOptions{Ref: defaultBranch},
 	)
-	
+
+	updatedFileContents := fileContents
+
+	// Handle SSH keys based on the generateSSHKeys flag
+	if generateSSHKeys {
+		// If the file exists, try to preserve existing SSH keys
+		if err == nil && fileContent != nil {
+			existingContent, err := fileContent.GetContent()
+			if err == nil {
+				// Extract SSH keys from existing content
+				privateKeyPattern := `SSH_PRIVATE_KEY=([^\n]+)`
+				publicKeyPattern := `SSH_PUBLIC_KEY=([^\n]+)`
+
+				privateKeyRe := regexp.MustCompile(privateKeyPattern)
+				publicKeyRe := regexp.MustCompile(publicKeyPattern)
+
+				privateKeyMatch := privateKeyRe.FindStringSubmatch(existingContent)
+				publicKeyMatch := publicKeyRe.FindStringSubmatch(existingContent)
+
+				if len(privateKeyMatch) > 1 && len(publicKeyMatch) > 1 {
+					// Use existing SSH keys
+					privateKey := strings.ReplaceAll(privateKeyMatch[1], "\\n", "\n")
+					publicKey := publicKeyMatch[1]
+					updatedFileContents = r.addSSHKeysToFileContents(fileContents, privateKey, publicKey)
+				} else {
+					// Generate new SSH keys if none exist
+					privateKey, publicKey, err := r.generateSSHKeyPair()
+					if err != nil {
+						return fmt.Errorf("failed to generate SSH key pair: %v", err)
+					}
+
+					// Upload the new deploy key
+					deployKeyTitle := fmt.Sprintf("terraform-deploy-key-%d", time.Now().Unix())
+					err = r.uploadDeployKey(ctx, owner, repoName, publicKey, deployKeyTitle, false)
+					if err != nil {
+						return fmt.Errorf("failed to upload deploy key: %v", err)
+					}
+
+					updatedFileContents = r.addSSHKeysToFileContents(fileContents, privateKey, publicKey)
+				}
+			}
+		} else {
+			// File doesn't exist yet, generate new SSH keys
+			privateKey, publicKey, err := r.generateSSHKeyPair()
+			if err != nil {
+				return fmt.Errorf("failed to generate SSH key pair: %v", err)
+			}
+
+			// Upload the new deploy key
+			deployKeyTitle := fmt.Sprintf("terraform-deploy-key-%d", time.Now().Unix())
+			err = r.uploadDeployKey(ctx, owner, repoName, publicKey, deployKeyTitle, false)
+			if err != nil {
+				return fmt.Errorf("failed to upload deploy key: %v", err)
+			}
+
+			updatedFileContents = r.addSSHKeysToFileContents(fileContents, privateKey, publicKey)
+		}
+	}
+
 	// Create update options
 	opts := &github.RepositoryContentFileOptions{
 		Message:   github.String("Update resources.toml via Terraform"),
-		Content:   []byte(fileContents),
+		Content:   []byte(updatedFileContents),
 		Branch:    github.String(defaultBranch),
 		Committer: &github.CommitAuthor{
 			Name:  github.String("Terraform Provider"),
 			Email: github.String("terraform@example.com"),
 		},
 	}
-	
+
 	// If the file exists, include its SHA
 	if err == nil && fileContent != nil {
 		opts.SHA = fileContent.SHA
 	}
-	
+
 	_, _, err = client.Repositories.CreateFile(ctx, owner, repoName, "resources.toml", opts)
 	if err != nil {
 		return fmt.Errorf("failed to update file in repository: %v", err)
 	}
-	
+
 	return nil
 }
 
@@ -914,4 +1021,82 @@ func (r *komodoResource) waitForServerStateEnabled(serverName string, maxAttempt
 	}
 	
 	return fmt.Errorf("server %s did not reach OK state after %d attempts", serverName, maxAttempts)
+}
+
+// generateSSHKeyPair generates an ed25519 SSH key pair and returns (privateKey, publicKey, error)
+func (r *komodoResource) generateSSHKeyPair() (string, string, error) {
+	// Generate ed25519 key pair
+	publicKey, privateKey, err := ed25519.GenerateKey(rand.Reader)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to generate ed25519 key pair: %v", err)
+	}
+
+	// Convert to SSH format
+	sshPublicKey, err := ssh.NewPublicKey(publicKey)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to convert public key to SSH format: %v", err)
+	}
+
+	// Format public key
+	publicKeyString := string(ssh.MarshalAuthorizedKey(sshPublicKey))
+
+	// Format private key in OpenSSH format
+	privateKeyBytes, err := ssh.MarshalPrivateKey(privateKey, "")
+	if err != nil {
+		return "", "", fmt.Errorf("failed to marshal private key: %v", err)
+	}
+
+	// Convert to PEM format
+	privateKeyPEM := pem.EncodeToMemory(privateKeyBytes)
+	privateKeyString := string(privateKeyPEM)
+
+	return privateKeyString, strings.TrimSpace(publicKeyString), nil
+}
+
+// uploadDeployKey uploads the public key as a deploy key to the GitHub repository
+func (r *komodoResource) uploadDeployKey(ctx context.Context, owner, repoName, publicKey, title string, readOnly bool) error {
+	ts := oauth2.StaticTokenSource(
+		&oauth2.Token{AccessToken: r.githubToken},
+	)
+	tc := oauth2.NewClient(ctx, ts)
+	client := github.NewClient(tc)
+
+	// Create deploy key
+	deployKey := &github.Key{
+		Title:    github.String(title),
+		Key:      github.String(publicKey),
+		ReadOnly: github.Bool(readOnly),
+	}
+
+	_, _, err := client.Repositories.CreateKey(ctx, owner, repoName, deployKey)
+	if err != nil {
+		return fmt.Errorf("failed to upload deploy key: %v", err)
+	}
+
+	return nil
+}
+
+// addSSHKeysToFileContents adds SSH keys to the environment section of the file contents
+func (r *komodoResource) addSSHKeysToFileContents(fileContents, privateKey, publicKey string) string {
+	// Find the environment section and add SSH keys before the closing """
+	envPattern := `environment = """([^"]*?)"""`
+	re := regexp.MustCompile(envPattern)
+
+	return re.ReplaceAllStringFunc(fileContents, func(match string) string {
+		// Extract the current environment content
+		envMatch := re.FindStringSubmatch(match)
+		if len(envMatch) < 2 {
+			return match
+		}
+
+		currentEnv := envMatch[1]
+
+		// Add SSH keys to the environment
+		sshKeysSection := fmt.Sprintf("\nSSH_PRIVATE_KEY=%s\nSSH_PUBLIC_KEY=%s",
+			strings.ReplaceAll(privateKey, "\n", "\\n"),
+			publicKey)
+
+		// Return the updated environment section
+		return fmt.Sprintf(`environment = """%s%s"""`, currentEnv, sshKeysSection)
+	})
 }
