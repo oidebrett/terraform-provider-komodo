@@ -1122,6 +1122,21 @@ func (r *komodoResource) uploadDeployKey(ctx context.Context, owner, repoName, p
 	return nil
 }
 
+// stripPEMHeaders strips the PEM headers from the key so that we can store as one line in the .env file
+func stripPEMHeaders(key string) string {
+    var lines []string
+    for _, line := range strings.Split(key, "\n") {
+        line = strings.TrimSpace(line)
+        if line == "" ||
+            strings.HasPrefix(line, "-----BEGIN") ||
+            strings.HasPrefix(line, "-----END") {
+            continue
+        }
+        lines = append(lines, line)
+    }
+    return strings.Join(lines, "")
+}
+
 // addSSHKeysToFileContents adds SSH keys to the environment section of the file contents
 func (r *komodoResource) addSSHKeysToFileContents(fileContents, privateKey, publicKey string) string {
 	// Find the environment section and add SSH keys before the closing """
@@ -1138,10 +1153,15 @@ func (r *komodoResource) addSSHKeysToFileContents(fileContents, privateKey, publ
 
 		currentEnv := envMatch[1]
 
-		// Add SSH keys to the environment
-		sshKeysSection := fmt.Sprintf("\nSSH_PRIVATE_KEY=%s\nSSH_PUBLIC_KEY=%s",
-			strings.ReplaceAll(privateKey, "\n", "\\n"),
-			publicKey)
+		// Strip PEM headers and collapse private key into one line
+		cleanedPrivateKey := stripPEMHeaders(privateKey)
+
+		// Add SSH keys to the environment (one line each)
+		sshKeysSection := fmt.Sprintf(
+			"\nSSH_PRIVATE_KEY=%s\nSSH_PUBLIC_KEY=%s",
+			cleanedPrivateKey,
+			strings.TrimSpace(publicKey),
+		)
 
 		// Return the updated environment section
 		return fmt.Sprintf(`environment = """%s%s"""`, currentEnv, sshKeysSection)
