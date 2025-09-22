@@ -831,9 +831,9 @@ func (r *komodoResource) updateFileInRepository(ctx context.Context, repoName, o
 		if err == nil && fileContent != nil {
 			existingContent, err := fileContent.GetContent()
 			if err == nil {
-				// Extract SSH keys from existing content
-				privateKeyPattern := `SSH_PRIVATE_KEY=([^\n]+)`
-				publicKeyPattern := `SSH_PUBLIC_KEY=([^\n]+)`
+				// Extract SSH keys from existing content (handle both quoted and unquoted)
+				privateKeyPattern := `SSH_PRIVATE_KEY="?([^"\n]+)"?`
+				publicKeyPattern := `SSH_PUBLIC_KEY="?([^"\n]+)"?`
 
 				privateKeyRe := regexp.MustCompile(privateKeyPattern)
 				publicKeyRe := regexp.MustCompile(publicKeyPattern)
@@ -905,8 +905,8 @@ func (r *komodoResource) updateFileInRepository(ctx context.Context, repoName, o
 	// Extract SSH keys from the updated content to return them
 	var privateKey, publicKey string
 	if generateSSHKeys {
-		privateKeyPattern := `SSH_PRIVATE_KEY=([^\n]+)`
-		publicKeyPattern := `SSH_PUBLIC_KEY=([^\n]+)`
+		privateKeyPattern := `SSH_PRIVATE_KEY="?([^"\n]+)"?`
+		publicKeyPattern := `SSH_PUBLIC_KEY="?([^"\n]+)"?`
 
 		privateKeyRe := regexp.MustCompile(privateKeyPattern)
 		publicKeyRe := regexp.MustCompile(publicKeyPattern)
@@ -1156,9 +1156,9 @@ func (r *komodoResource) addSSHKeysToFileContents(fileContents, privateKey, publ
 		// Strip PEM headers and collapse private key into one line
 		cleanedPrivateKey := stripPEMHeaders(privateKey)
 
-		// Add SSH keys to the environment (one line each)
+		// Add SSH keys to the environment (one line each) with quotes to handle spaces
 		sshKeysSection := fmt.Sprintf(
-			"\nSSH_PRIVATE_KEY=%s\nSSH_PUBLIC_KEY=%s",
+			"\nSSH_PRIVATE_KEY=\"%s\"\nSSH_PUBLIC_KEY=\"%s\"",
 			cleanedPrivateKey,
 			strings.TrimSpace(publicKey),
 		)
