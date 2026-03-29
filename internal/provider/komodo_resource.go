@@ -160,24 +160,10 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// 1. Wait for periphery to connect outbound and self-register in Komodo.
-	// The VM is named "server-{name}" so periphery's OS hostname becomes "server-{name}",
-	// which is the server name Komodo creates when periphery connects via onboarding key.
-	// No need to pre-create the server - Komodo creates it automatically.
+	// Server will self-register via outbound periphery using onboarding key
 	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
-	cleanupTasks = append(cleanupTasks, func() {
-		deleteServerPayload := fmt.Sprintf(`{
-			"type": "DeleteServer",
-			"params": {
-				"id": "%s"
-			}
-		}`, serverName)
-		if err := r.makeAPICall(deleteServerPayload, r.endpoint+"write"); err != nil {
-			resp.Diagnostics.AddWarning("Cleanup Warning", fmt.Sprintf("Failed to delete server during cleanup: %s", err))
-		}
-	})
 
-	// Wait for periphery to connect and register the server (checks every 10s for up to 5 min)
+	// Wait for the server to become available, checking every 10 seconds for up to 5 minutes
 	err = r.waitForServerAvailability(serverName, 30, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to become available: %s", err))
@@ -970,25 +956,9 @@ func (r *komodoResource) waitForServerAvailability(serverName string, maxAttempt
 		
 		// If we get a 200 OK, the server exists
 		if resp.StatusCode == http.StatusOK {
-			bodyBytes, err := io.ReadAll(resp.Body)
-			if err != nil {
-				return fmt.Errorf("error reading response body: %s", err)
-			}
-			
-			// Parse the response to check if the server is properly configured
-			var result map[string]interface{}
-			err = json.Unmarshal(bodyBytes, &result)
-			if err != nil {
-				return fmt.Errorf("error parsing response: %s", err)
-			}
-			
-			// Check if the server has the expected configuration
-			if config, ok := result["config"].(map[string]interface{}); ok {
-				if _, ok := config["address"]; ok {
-					// Server exists and has an address configured
-					return nil
-				}
-			}
+			// Server exists in Komodo - periphery has connected and self-registered
+			// In outbound mode, periphery connects to Core so no address is stored
+			return nil
 		}
 		
 		// Wait before the next attempt
