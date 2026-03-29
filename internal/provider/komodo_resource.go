@@ -160,18 +160,18 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// 1. Create a server using the server_ip
+	// 1. Create a server entry in Komodo (without address - periphery connects outbound)
+	// The address will be set automatically when periphery connects using the onboarding key.
+	// PERIPHERY_CONNECT_AS requires the server to already exist, so we create it here first.
 	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
 	createServerPayload := fmt.Sprintf(`{
 		"type": "CreateServer",
 		"params": {
 			"name": "%s",
-			"config": {
-				"address": "https://%s:8120"
-			},
+			"config": {},
 			"tags": ["%s"]
 		}
-	}`, serverName, state.ServerIP.ValueString(), state.Name.ValueString())
+	}`, serverName, state.Name.ValueString())
 
 	err = r.makeAPICall(createServerPayload, r.endpoint+"write")
 	if err != nil {
