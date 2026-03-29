@@ -160,24 +160,11 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// 1. Create a server entry in Komodo (without address - periphery connects outbound)
-	// The address will be set automatically when periphery connects using the onboarding key.
-	// PERIPHERY_CONNECT_AS requires the server to already exist, so we create it here first.
+	// 1. Wait for periphery to connect outbound and self-register in Komodo.
+	// The VM is named "server-{name}" so periphery's OS hostname becomes "server-{name}",
+	// which is the server name Komodo creates when periphery connects via onboarding key.
+	// No need to pre-create the server - Komodo creates it automatically.
 	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
-	createServerPayload := fmt.Sprintf(`{
-		"type": "CreateServer",
-		"params": {
-			"name": "%s",
-			"config": {},
-			"tags": ["%s"]
-		}
-	}`, serverName, state.Name.ValueString())
-
-	err = r.makeAPICall(createServerPayload, r.endpoint+"write")
-	if err != nil {
-		resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error creating server: %s", err))
-		return
-	}
 	cleanupTasks = append(cleanupTasks, func() {
 		deleteServerPayload := fmt.Sprintf(`{
 			"type": "DeleteServer",
@@ -190,7 +177,7 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// Wait for the server to become available, checking every 10 seconds for up to 5 minutes
+	// Wait for periphery to connect and register the server (checks every 10s for up to 5 min)
 	err = r.waitForServerAvailability(serverName, 30, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to become available: %s", err))
