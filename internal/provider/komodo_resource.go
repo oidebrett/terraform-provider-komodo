@@ -201,7 +201,7 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		"params": {
 			"name": "%s_ContextWare",
 			"config": {
-				"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"ManidaeCloud/%s_syncresources\"\ngit_account = \"oidebrett\"\nresource_path = [\"resources.toml\"]"
+				"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"ManidaeCloud/%s_syncresources\"\ngit_account = \"oidebrett\"\nresource_path = [\"resources.toml\"]\ninclude_user_groups = true"
 			}
 		}
 	}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
@@ -556,7 +556,7 @@ func (r *komodoResource) Update(ctx context.Context, req tfresource.UpdateReques
 			"params": {
 				"name": "%s_ContextWare",
 				"config": {
-					"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"manidaecloud/%s_syncresources\"\ngit_account = \"oidebrett\"\nresource_path = [\"resources.toml\"]"
+					"file_contents": "[[resource_sync]]\nname = \"%s_ResourceSetup\"\n[resource_sync.config]\nrepo = \"ManidaeCloud/%s_syncresources\"\ngit_account = \"oidebrett\"\nresource_path = [\"resources.toml\"]\ninclude_user_groups = true"
 				}
 			}
 		}`, state.Name.ValueString(), state.Name.ValueString(), strings.ToLower(state.Name.ValueString()))
