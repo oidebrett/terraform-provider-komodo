@@ -248,8 +248,13 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// Wait for the ContextWare sync to complete (up to 15 seconds)
-	time.Sleep(15 * time.Second)
+	// Wait for the ContextWare sync to create the inner ResourceSetup resource.
+	// The execute endpoint is async — RunSync returns when queued, not when
+	// the sync's effects (creating the inner sync) are committed.
+	if err := r.waitForResourceSyncExists(state.Name.ValueString()+"_ResourceSetup", 60, 1*time.Second); err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("ResourceSetup sync did not appear after ContextWare sync ran: %s", err))
+		return
+	}
 
 	// 4. Now run the ResourceSetup sync
 	runResourceSetupPayload := fmt.Sprintf(`{
@@ -296,8 +301,12 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		}
 	})
 
-	// Wait for the ResourceSetup sync to complete (up to 15 seconds)
-	time.Sleep(15 * time.Second)
+	// Wait for the ResourceSetup sync to apply its TOML — the procedure
+	// appearing is the precondition we actually need for RunProcedure below.
+	if err := r.waitForProcedureExists(state.Name.ValueString()+"_ProcedureApply", 120, 1*time.Second); err != nil {
+		resp.Diagnostics.AddError("API Error", fmt.Sprintf("ProcedureApply did not appear after ResourceSetup sync ran: %s", err))
+		return
+	}
 
 	// 5. Run Procedure
 	runProcedurePayload := fmt.Sprintf(`{
@@ -566,7 +575,14 @@ func (r *komodoResource) Update(ctx context.Context, req tfresource.UpdateReques
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error updating resource sync: %s", err))
 			return
 		}
-		
+
+		// Wait for the inner ResourceSetup sync to exist before running it
+		// (handles the case where Create's outer sync hasn't fully committed).
+		if err := r.waitForResourceSyncExists(state.Name.ValueString()+"_ResourceSetup", 60, 1*time.Second); err != nil {
+			resp.Diagnostics.AddError("API Error", fmt.Sprintf("ResourceSetup sync did not appear: %s", err))
+			return
+		}
+
 		// 2. Run Sync
 		runSyncPayload := fmt.Sprintf(`{
 			"type": "RunSync",
@@ -574,13 +590,19 @@ func (r *komodoResource) Update(ctx context.Context, req tfresource.UpdateReques
 				"sync": "%s_ResourceSetup"
 			}
 		}`, state.Name.ValueString())
-		
+
 		err = r.makeAPICall(runSyncPayload, r.endpoint+"execute")
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running sync: %s", err))
 			return
 		}
-		
+
+		// Wait for the sync to commit the procedure before running it.
+		if err := r.waitForProcedureExists(state.Name.ValueString()+"_ProcedureApply", 120, 1*time.Second); err != nil {
+			resp.Diagnostics.AddError("API Error", fmt.Sprintf("ProcedureApply did not appear after sync ran: %s", err))
+			return
+		}
+
 		// 3. Run Procedure
 		runProcedurePayload := fmt.Sprintf(`{
 			"type": "RunProcedure",
@@ -588,7 +610,7 @@ func (r *komodoResource) Update(ctx context.Context, req tfresource.UpdateReques
 				"procedure": "%s_ProcedureApply"
 			}
 		}`, state.Name.ValueString())
-		
+
 		err = r.makeAPICall(runProcedurePayload, r.endpoint+"execute")
 		if err != nil {
 			resp.Diagnostics.AddError("API Error", fmt.Sprintf("Error running procedure: %s", err))
@@ -923,6 +945,33 @@ func (r *komodoResource) makeAPICall(payload string, url string) error {
 	return nil
 }
 
+// waitForResourceSyncExists polls GetResourceSync until the resource is
+// retrievable. Komodo's execute endpoint is async, so a successful RunSync on
+// an outer sync that creates an inner sync returns before the inner exists.
+func (r *komodoResource) waitForResourceSyncExists(syncName string, maxAttempts int, sleepDuration time.Duration) error {
+	payload := fmt.Sprintf(`{"type":"GetResourceSync","params":{"sync":"%s"}}`, syncName)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := r.makeAPICall(payload, r.endpoint+"read"); err == nil {
+			return nil
+		}
+		time.Sleep(sleepDuration)
+	}
+	return fmt.Errorf("resource sync %s did not appear after %d attempts", syncName, maxAttempts)
+}
+
+// waitForProcedureExists polls GetProcedure until it returns 200. Used to
+// confirm a sync has actually applied its TOML before RunProcedure is called.
+func (r *komodoResource) waitForProcedureExists(procedureName string, maxAttempts int, sleepDuration time.Duration) error {
+	payload := fmt.Sprintf(`{"type":"GetProcedure","params":{"procedure":"%s"}}`, procedureName)
+	for attempt := 1; attempt <= maxAttempts; attempt++ {
+		if err := r.makeAPICall(payload, r.endpoint+"read"); err == nil {
+			return nil
+		}
+		time.Sleep(sleepDuration)
+	}
+	return fmt.Errorf("procedure %s did not appear after %d attempts", procedureName, maxAttempts)
+}
+
 // Add this helper function to check if a server is available
 func (r *komodoResource) waitForServerAvailability(serverName string, maxAttempts int, sleepDuration time.Duration) error {
 	for attempt := 1; attempt <= maxAttempts; attempt++ {
@@ -1115,7 +1164,7 @@ func (r *komodoResource) addSSHKeysToFileContents(fileContents, privateKey, publ
 
 		// Add SSH keys to the environment (one line each) with quotes to handle spaces
 		sshKeysSection := fmt.Sprintf(
-			"\nSSH_PRIVATE_KEY=\"%s\"\nSSH_PUBLIC_KEY=\"%s\"",
+			"\nSSH_PRIVATE_KEY=\"%s\"\nSSH_PUBLIC_KEY=\"%s\"\n",
 			cleanedPrivateKey,
 			strings.TrimSpace(publicKey),
 		)

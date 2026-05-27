@@ -8,6 +8,7 @@ require (
 	github.com/google/go-github/v53 v53.2.0
 	github.com/hashicorp/terraform-plugin-framework v1.15.0
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.37.0
+	golang.org/x/crypto v0.38.0
 	golang.org/x/oauth2 v0.26.0
 )
 
@@ -44,7 +45,6 @@ require (
 	github.com/vmihailenco/msgpack/v5 v5.4.1 // indirect
 	github.com/vmihailenco/tagparser/v2 v2.0.0 // indirect
 	github.com/zclconf/go-cty v1.16.2 // indirect
-	golang.org/x/crypto v0.38.0 // indirect
 	golang.org/x/mod v0.24.0 // indirect
 	golang.org/x/net v0.39.0 // indirect
 	golang.org/x/sync v0.14.0 // indirect
