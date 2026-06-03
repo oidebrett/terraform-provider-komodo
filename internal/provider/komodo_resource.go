@@ -163,8 +163,10 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 	// Server will self-register via outbound periphery using onboarding key
 	serverName := fmt.Sprintf("server-%s", strings.ToLower(state.Name.ValueString()))
 
-	// Wait for the server to become available, checking every 10 seconds for up to 5 minutes
-	err = r.waitForServerAvailability(serverName, 30, 10*time.Second)
+	// Wait for the server to become available, checking every 10 seconds for up to 15 minutes.
+	// 5 minutes wasn't enough on slow shared-CPU instances (GCP e2-medium) doing apt + docker +
+	// nvm + node + npm ci + 1.3 GB sandbox-base pull before komodo periphery comes online.
+	err = r.waitForServerAvailability(serverName, 90, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to become available: %s", err))
 		return
@@ -187,8 +189,9 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 		return
 	}
 
-	// Wait for the server to reach OK state, checking every 10 seconds for up to 5 minutes
-	err = r.waitForServerStateEnabled(serverName, 30, 10*time.Second)
+	// Wait for the server to reach OK state, checking every 10 seconds for up to 15 minutes
+	// (same reasoning as waitForServerAvailability above).
+	err = r.waitForServerStateEnabled(serverName, 90, 10*time.Second)
 	if err != nil {
 		resp.Diagnostics.AddError("Server Error", fmt.Sprintf("Error waiting for server to reach OK state: %s", err))
 		return
