@@ -123,11 +123,16 @@ func (r *komodoResource) Create(ctx context.Context, req tfresource.CreateReques
 	var cleanupTasks []func()
 
 	// Defer the execution of cleanup tasks in case of an error.
+	// On Create() failure terraform-plugin-framework does NOT put the resource into
+	// state, so terraform's later destroy can't reach the partial cloud state via
+	// Delete(). Running cleanupTasks here is the only way the GitHub repo (and any
+	// other side-effects we register below) gets torn down — without this the repo
+	// is orphaned forever.
 	defer func() {
 		if resp.Diagnostics.HasError() {
 			// Run cleanup tasks in reverse order.
 			for i := len(cleanupTasks) - 1; i >= 0; i-- {
-			// uncomment this to clean up tasks	- cleanupTasks[i]()
+				cleanupTasks[i]()
 			}
 		}
 	}()
