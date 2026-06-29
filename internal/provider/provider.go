@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 	"strings"
+	"time"
 	"github.com/hashicorp/terraform-plugin-sdk/v2/helper/schema"
 
 	tfdatasource "github.com/hashicorp/terraform-plugin-framework/datasource"
@@ -101,7 +102,12 @@ func (p *KomodoProvider) Configure(ctx context.Context, req tfprovider.Configure
 	p.apiSecret = data.ApiSecret.ValueString()
 	p.githubToken = data.GithubToken.ValueString() // Store the GitHub token
 	p.githubOrgname = data.GithubOrgname.ValueString() // Store the GitHub org name
-	p.client = http.DefaultClient
+	// http.DefaultClient has no timeout (Timeout: 0) — a Komodo core that
+	// accepts the connection but never responds would block the request (and
+	// therefore terraform apply) forever, holding the state lock and leaving
+	// cloud resources live. Use a bounded client so a stuck call fails fast and
+	// the retry loops / terraform can make progress.
+	p.client = &http.Client{Timeout: 60 * time.Second}
 	
 	resp.DataSourceData = p
 	resp.ResourceData = p

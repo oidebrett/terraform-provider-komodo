@@ -992,7 +992,7 @@ func (r *komodoResource) waitForServerAvailability(serverName string, maxAttempt
 		}`, serverName)
 		
 		// Make the API call
-		client := &http.Client{}
+		client := &http.Client{Timeout: 60 * time.Second}
 		req, err := http.NewRequest("POST", r.endpoint+"read", bytes.NewBuffer([]byte(getServerPayload)))
 		if err != nil {
 			return fmt.Errorf("error creating request: %s", err)
@@ -1037,7 +1037,7 @@ func (r *komodoResource) waitForServerStateEnabled(serverName string, maxAttempt
 		}`, serverName)
 		
 		// Make the API call
-		client := &http.Client{}
+		client := &http.Client{Timeout: 60 * time.Second}
 		req, err := http.NewRequest("POST", r.endpoint+"read", bytes.NewBuffer([]byte(getServerStatePayload)))
 		if err != nil {
 			return fmt.Errorf("error creating request: %s", err)
